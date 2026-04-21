@@ -1,4 +1,8 @@
 <Solution>
+  <Folder Name="/installer/" />
+  <Folder Name="/installer/App/">
+    <Project Path="installer/App/LiveStreamSound.App.Installer.wixproj" Type="b7dd6f7e-def8-4e67-b5b7-07ef123db6f0" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/LiveStreamSound.App/LiveStreamSound.App.csproj" />
     <Project Path="src/LiveStreamSound.Client/LiveStreamSound.Client.csproj" />

@@ -1,13 +1,19 @@
-name: Build App (on demand)
+name: Build MSI (on demand)
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'installer/**'
+      - '.github/workflows/build-msi-on-demand.yml'
 
 permissions:
   contents: read
 
 jobs:
-  build-app:
+  build-msi:
     runs-on: windows-latest
 
     steps:
@@ -19,6 +25,9 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      - name: Install WiX Toolset
+        run: dotnet tool install --global wix --version 5.0.2
+
       - name: Restore
         run: dotnet restore LiveStreamSound.slnx
 
@@ -28,19 +37,33 @@ jobs:
           dotnet build src/LiveStreamSound.Host/LiveStreamSound.Host.csproj -c Release --no-restore
           dotnet build src/LiveStreamSound.Client/LiveStreamSound.Client.csproj -c Release --no-restore
 
-      - name: Build App (single exe)
-        run: dotnet build src/LiveStreamSound.App/LiveStreamSound.App.csproj -c Release --no-restore
+      - name: Publish App (self-contained, bundled .NET runtime)
+        run: >
+          dotnet publish src/LiveStreamSound.App/LiveStreamSound.App.csproj
+          -c Release
+          -r win-x64
+          --self-contained true
+          -p:PublishSingleFile=false
+          -p:PublishReadyToRun=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          --no-restore
 
-      - name: Publish self-contained
-        run: dotnet publish src/LiveStreamSound.App/LiveStreamSound.App.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o publish/
+      - name: Build MSI installer
+        run: dotnet build installer/App/LiveStreamSound.App.Installer.wixproj -c Release --no-restore
 
-      - name: Upload App artifacts
+      - name: Upload MSI artifact
         uses: actions/upload-artifact@v4
         with:
-          name: LiveStreamSound-App
+          name: LiveStreamSound-MSI
           if-no-files-found: error
           path: |
-            publish/**
+            installer/App/bin/Release/*.msi
+            installer/App/bin/Release/*.wixpdb
 
-      # MSI installer (single bundle) comes in a later milestone —
-      # current release is published as a self-contained win-x64 build.
+      - name: Upload self-contained publish folder
+        uses: actions/upload-artifact@v4
+        with:
+          name: LiveStreamSound-App-Portable
+          if-no-files-found: error
+          path: |
+            src/LiveStreamSound.App/bin/Release/net10.0-windows/win-x64/publish/**

@@ -1,7 +1,7 @@
 # LiveStreamSound-Matura
 
-> 🇩🇪 Kabellose Audio-Verteilung für Matura-Prüfungen — Host/Client über Netzwerk statt Kabel.
-> 🇬🇧 Wireless audio distribution for school final exams — LAN host/client instead of cables.
+> 🇩🇪 Kabellose Audio-Verteilung für Matura-Prüfungen — **eine** App, beim Start wählt man *senden* oder *empfangen*.
+> 🇬🇧 Wireless audio distribution for school final exams — **one** app that asks whether to send or receive at launch.
 
 English version: [README.en.md](README.en.md) · Lehrer-Anleitung: [docs/Anleitung.md](docs/Anleitung.md)
 
@@ -11,27 +11,28 @@ English version: [README.en.md](README.en.md) · Lehrer-Anleitung: [docs/Anleitu
 
 Für die Englisch-Matura müssen Hörverstehens-Audiodateien in zusammengelegten Modulräumen abgespielt werden. Bisher wurde dafür ein Kabel durch die gesamte Klasse verlegt — umständlich und störanfällig.
 
-**LiveStreamSound** besteht aus zwei Apps:
+**LiveStreamSound** ist eine einzige Windows-App. Beim Start entscheidest du:
 
-- **Host** läuft auf dem Lehrer-Laptop. Der Ton, der auf dem Host abgespielt wird (z.B. in VLC oder Browser), wird per WLAN/LAN an alle Clients gestreamt.
-- **Client** läuft auf den Raum-Laptops, die per HDMI mit Beamer/Lautsprechern verbunden sind. Der Client empfängt den Stream und gibt ihn synchron aus.
+- **📡 Ton senden** — dein Laptop ist der Host. Der Ton, der auf dem PC abgespielt wird (VLC, Browser, …), wird per WLAN/LAN an alle Clients gestreamt.
+- **🎧 Ton empfangen** — dein Laptop ist Client am Beamer/Lautsprecher. Er empfängt den Stream synchron und gibt ihn über HDMI aus.
 
-Lehrer steuern alles zentral: Lautstärke pro Raum, Stummschaltung, HDMI-Ausgabegerät-Wahl, Verbindung trennen.
+Dieselbe `.exe`. Rolle kann zur Laufzeit im Burger-Menü gewechselt werden.
 
 ## Features
 
-- 🎯 System-Audio-Loopback (WASAPI) — alles was der Host abspielt wird gestreamt
+- 🎯 System-Audio-Loopback (WASAPI) — alles was auf dem Host abgespielt wird, wird gestreamt
 - 🔒 6-stelliger Session-Code, keine Passwörter
-- 🔍 Automatische Discovery per mDNS + Fallback manuelle IP + QR-Code
-- ⏱️ Synchrone Wiedergabe auf allen Clients (Timestamp-basierter Jitter-Buffer)
+- 🔍 Automatische Discovery per mDNS + Fallback manuelle IP
+- 📨 **Host kann Clients aktiv einladen** (Client bestätigt mit Accept/Reject-Dialog) — Lehrer muss nicht mehr zum Raum-PC gehen
+- ⏱️ Synchrone Wiedergabe auf allen Clients (Timestamp-basierter Jitter-Buffer, NTP-like Clock-Sync)
 - 🎚️ Pro-Client Fernsteuerung: Lautstärke, Stumm, Ausgabegerät, Kick
-- 🏷️ Automatische Erkennung der Raum-Nummer aus dem Hostnamen (`HP-KB-017` → „Raum 017")
+- 🏷️ Automatische Erkennung der Raum-Nummer aus dem Hostnamen (`HP-KB-017` → „Raum 017"), kategorisiert nach Klassenraum / Werkstatt / Sonstige
 - 🌐 Deutsch + Englisch, zur Laufzeit umschaltbar
-- 🌓 Hell- und Dunkelmodus (Fluent / Windows-11 Optik)
-- 🩺 Verbindungs-Qualitäts-Anzeige mit Erklärungen bei Problemen
+- 🌓 Hell- und Dunkelmodus (folgt System-Theme beim Start, Fluent-/Windows-11-Optik)
+- 🩺 Verbindungs-Qualitäts-Anzeige mit Klartext-Problem-Erklärungen
 - 📓 Fehlerlog in-app und auf Datei (`%LOCALAPPDATA%\LiveStreamSound\...\logs\`)
 - ❓ Eingebaute Bedienungshilfe in der GUI
-- 📦 MSI-Installer für Host und Client (Firewall-Regeln automatisch)
+- 📦 **Single MSI-Installer mit gebundeltem .NET 10 Runtime** — keine separate .NET-Installation nötig, Firewall-Regeln automatisch
 
 ## Technik-Stack
 
@@ -40,25 +41,27 @@ Lehrer steuern alles zentral: Lautstärke pro Raum, Stummschaltung, HDMI-Ausgabe
 - **NAudio** 2.2 für WASAPI-Capture und -Playback
 - **Concentus** 2.2 für Opus Encoding/Decoding (reines C#, keine native DLL)
 - **Makaretu.Dns.Multicast** für mDNS Service Discovery
-- **QRCoder** für QR-Code-Generierung
 - **CommunityToolkit.Mvvm** für MVVM mit Source Generators
-- **WiX Toolset 5** für MSI-Installer
+- **WiX Toolset 5** für single-Bundle MSI-Installer
 
 ## Projekt-Struktur
 
 ```
 LiveStreamSound-Matura/
 ├── LiveStreamSound.slnx
-├── Directory.Build.props        # Gemeinsame Build-Einstellungen
+├── Directory.Build.props
 ├── src/
-│   ├── LiveStreamSound.Shared/  # Protokoll, Audio-Packet, i18n, Diagnostik
-│   ├── LiveStreamSound.Host/    # Lehrer-App: capture + server
-│   └── LiveStreamSound.Client/  # Raum-App: receive + HDMI-Ausgabe
+│   ├── LiveStreamSound.Shared/     # Protokoll, Audio-Packet, i18n, Diagnostik
+│   ├── LiveStreamSound.Host/       # Host-Services (Lib): Capture, Session, Control/Audio-Server
+│   ├── LiveStreamSound.Client/     # Client-Services (Lib): Discovery, Control/Audio-Client, Sync, Playback
+│   └── LiveStreamSound.App/        # WPF-Exe: Role-Selection + Host- & Client-Dashboards
 ├── installer/
-│   ├── Host/                    # WiX MSI für Host
-│   └── Client/                  # WiX MSI für Client
+│   └── App/                        # WiX-Projekt → single MSI inkl. .NET Runtime
+├── .github/workflows/
+│   └── build-msi-on-demand.yml     # CI: self-contained Publish + MSI-Build + Artifact-Upload
 └── docs/
-    └── Anleitung.md             # Lehrer-Anleitung
+    ├── Anleitung.md                # Lehrer-Anleitung (DE)
+    └── Guide.md                    # Teacher manual (EN)
 ```
 
 ## Bauen
@@ -69,27 +72,54 @@ Für MSI zusätzlich: `dotnet tool install --global wix --version 5.0.2`
 ```powershell
 # Vom Repo-Root aus:
 dotnet restore
-dotnet build -c Release
+dotnet build src/LiveStreamSound.App -c Release
 
-# MSI bauen (erzeugt .msi unter installer/Host/bin/Release/ bzw. installer/Client/bin/Release/)
-dotnet build installer/Host       -c Release
-dotnet build installer/Client     -c Release
+# Self-contained Publish mit gebundeltem .NET-Runtime:
+dotnet publish src/LiveStreamSound.App -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false
+
+# MSI bauen (nutzt den Publish-Ordner automatisch):
+dotnet build installer/App -c Release
+# → installer/App/bin/Release/LiveStreamSound-<version>.msi
 ```
 
-> Die Host- und Client-Projekte haben `EnableWindowsTargeting=true`, dadurch klappen `dotnet restore` und **compile** der Code-Projekte auch auf macOS/Linux. Ausgeführt werden kann nur unter Windows (wegen WPF + WASAPI).
->
-> Die WiX-Installer-Projekte (`installer/Host`, `installer/Client`) sind **Windows-only** (WiX Toolset selbst unterstützt nichts anderes). Auf macOS/Linux schlägt deren Build fehl — das ist erwartet. Bauen nur auf Windows:
-> ```powershell
-> dotnet build src/LiveStreamSound.Shared src/LiveStreamSound.Host src/LiveStreamSound.Client -c Release
-> dotnet build installer/Host installer/Client -c Release
-> ```
-> Auf Nicht-Windows-Systemen kann man per `dotnet build src/...` alle Code-Projekte einzeln bauen.
+> Die Libraries (Shared, Host, Client) haben `EnableWindowsTargeting=true`, dadurch klappt `dotnet restore`/`build` der Code-Projekte auch auf macOS/Linux. Ausgeführt werden kann nur unter Windows (wegen WPF + WASAPI). Die App + MSI sollten auf Windows gebaut werden.
+
+### CI (GitHub Actions)
+
+Der Workflow [.github/workflows/build-msi-on-demand.yml](.github/workflows/build-msi-on-demand.yml) baut auf jedem `main`-Push und on-demand einen MSI:
+
+1. `dotnet restore`
+2. Baut alle 3 Libs Release
+3. `dotnet publish` self-contained win-x64 (inkl. ReadyToRun)
+4. Baut WiX-MSI-Projekt
+5. Lädt MSI + Portable-App als GitHub-Artifact hoch
+
+Der MSI-Artifact kann direkt auf einen frischen Windows-PC gespielt werden — kein separates .NET 10 nötig.
+
+## Netzwerk-Ports
+
+| Port | Protokoll | Zweck |
+|---|---|---|
+| 5000 | TCP | Host-Control-Channel (JSON-Messages) |
+| 5001 | UDP | Host-Audio-Stream (Opus, fan-out zu jedem Client) |
+| 5002 | TCP | Idle-Client-Listener (empfängt Einladungen vom Host) |
+| 5353 | UDP | mDNS (Service Discovery) |
+
+Der MSI fügt TCP 5000, UDP 5001, TCP 5002 automatisch zu den Windows-Firewall-Regeln hinzu (Scope: LocalSubnet).
 
 ## Protokoll
 
-**Discovery (mDNS):** `_livestreamsound._tcp`, TXT-Records `v` (Protocol-Version), `name` (Session-Name).
+**Discovery (mDNS):**
+- `_livestreamsound._tcp` — aktive Hosts
+- `_lssclient._tcp` — idle Clients warten auf Einladung
+- TXT-Records `v` (Protocol-Version), `name` (Instanz-Name aka Session-Name bzw. Raum-Name)
 
-**Control-Channel (TCP, Port 5000):** JSON-Messages mit `type`-Diskriminator. Erste Message Client → Host: `HELLO {code, clientName, protocolVersion}`. Antwort: `WELCOME {clientId, audioUdpPort, sampleRate, channels, audioCodec, serverTimeMs}` oder `AUTH_FAIL {reason}`.
+**Control-Channel (TCP, Port 5000):** JSON mit `type`-Diskriminator.
+- Client → Host: `hello {code, clientName, protocolVersion}`
+- Host → Client: `welcome {clientId, audioUdpPort, sampleRate, channels, audioCodec, serverTimeMs}` | `authFail {reason}`
+- Host → Client: `setVolume`, `setMute`, `setOutputDevice`, `listOutputDevices`, `kick`
+- Beide: `ping`/`pong` (Keepalive + Clock-Sync)
+- Host → idle Client (auf Port 5002): `invitation {sessionCode, hostAddress, hostControlPort, hostDisplayName}` → Client antwortet `invitationResponse {accepted, reason?}`
 
 **Audio-Channel (UDP, Port 5001):** Binäres Paket
 ```
@@ -97,11 +127,11 @@ dotnet build installer/Client     -c Release
 ```
 Frames sind 20 ms (960 Samples @ 48 kHz).
 
-**Sync:** Client berechnet Clock-Offset zum Server via PING/PONG. Jedes Audio-Frame wird bei `serverTimestamp + 100 ms` in lokaler Zeit abgespielt → synchron auf allen Clients.
+**Sync:** Client berechnet Clock-Offset zum Server via PING/PONG (best-RTT-Estimate). Jedes Audio-Frame wird bei `serverTimestamp + 100 ms` in lokaler Zeit abgespielt → synchron auf allen Clients.
 
 ## Status
 
-Erste Version (0.1.0) — alle Kernkomponenten implementiert und kompiliert, Ende-zu-Ende-Test mit mehreren echten Clients ausstehend (Hardware wird beim nächsten Matura-Testdurchlauf erprobt).
+v0.2 — Unified-App-Refactor fertig, Invite-Protokoll (bidirektionale Session-Initiierung) implementiert. Ende-zu-Ende-Test mit mehreren echten Clients ausstehend (nächster Matura-Testdurchlauf).
 
 ## Lizenz
 

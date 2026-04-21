@@ -1,0 +1,19 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <OutputName>LiveStreamSound-$(Version)</OutputName>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <!--
+      AppPublishDir points at the `dotnet publish -c Release -r win-x64 (self-contained)`
+      output, which includes the .NET 10 runtime alongside the app so the MSI runs on a
+      freshly imaged Windows box without a separate .NET install.
+    -->
+    <DefineConstants>AppPublishDir=$(MSBuildThisFileDirectory)..\..\src\LiveStreamSound.App\bin\$(Configuration)\net10.0-windows\win-x64\publish\</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" Version="5.0.2" />
+    <PackageReference Include="WixToolset.Firewall.wixext" Version="5.0.2" />
+    <PackageReference Include="WixToolset.Util.wixext" Version="5.0.2" />
+  </ItemGroup>
+</Project>
