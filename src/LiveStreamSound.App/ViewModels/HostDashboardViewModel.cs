@@ -199,6 +199,16 @@ public partial class HostDashboardViewModel : ObservableObject
     [RelayCommand] private void ClearLogView() => LogEntries.Clear();
 
     [RelayCommand]
+    private void OpenInviteDialog()
+    {
+        var dlg = new Views.InviteClientDialog(_orchestrator)
+        {
+            Owner = System.Windows.Application.Current.MainWindow
+        };
+        dlg.Show();
+    }
+
+    [RelayCommand]
     private void SwitchRole()
     {
         if (AppShell.Current.HasActiveSession)

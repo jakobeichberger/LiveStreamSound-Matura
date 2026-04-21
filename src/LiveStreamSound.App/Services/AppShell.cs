@@ -41,6 +41,7 @@ public sealed class AppShell
         DisposeCurrentRole();
         Client = new ClientOrchestrator();
         Client.Discovery.Start();
+        Client.StartIdleListener();
         CurrentRole = Role.Client;
         SwapTo(() => new ClientDashboardWindow());
     }
