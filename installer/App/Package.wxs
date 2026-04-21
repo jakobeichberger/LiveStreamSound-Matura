@@ -12,13 +12,18 @@
     <MajorUpgrade DowngradeErrorMessage="Eine neuere Version von !(bind.Property.ProductName) ist bereits installiert." />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 
+    <!-- App icon used in Start Menu, Desktop shortcuts, and Add/Remove Programs. -->
+    <Icon Id="app.ico" SourceFile="$(AppPublishDir)Assets\app.ico" />
+    <Property Id="ARPPRODUCTICON" Value="app.ico" />
+
     <Feature Id="Main" Title="LiveStreamSound" Level="1">
       <!--
-        Includes everything from the self-contained publish folder — app binaries,
-        WPF-UI dependencies, .NET 10 runtime host, Opus/NAudio native interop, etc.
+        Self-contained publish folder: app binaries, WPF-UI, NAudio, Concentus,
+        Makaretu.Dns, CommunityToolkit.Mvvm, and the .NET 10 runtime host.
       -->
       <Files Include="$(AppPublishDir)**" />
-      <ComponentGroupRef Id="AppShortcuts" />
+      <ComponentGroupRef Id="StartMenuShortcuts" />
+      <ComponentGroupRef Id="DesktopShortcuts" />
       <ComponentGroupRef Id="AppFirewall" />
     </Feature>
 
@@ -30,26 +35,44 @@
       <Directory Id="ShortcutFolder" Name="LiveStreamSound" />
     </StandardDirectory>
 
-    <ComponentGroup Id="AppShortcuts" Directory="ShortcutFolder">
-      <Component Id="MainShortcut" Guid="7E4D2F11-19B8-4F9F-9A0D-33B1C2F1B301">
-        <Shortcut Id="StartMenuShortcut"
+    <!-- CommonDesktopFolder = %PUBLIC%\Desktop, visible for every user on the machine. -->
+    <StandardDirectory Id="CommonDesktopFolder" />
+
+    <!-- Start Menu shortcut (per-user KeyPath required by ICE38/43/57 even on per-machine scope). -->
+    <ComponentGroup Id="StartMenuShortcuts" Directory="ShortcutFolder">
+      <Component Id="StartMenuShortcut" Guid="7E4D2F11-19B8-4F9F-9A0D-33B1C2F1B301">
+        <Shortcut Id="StartMenuShortcutItem"
                   Name="LiveStreamSound"
                   Description="Ton kabellos senden oder empfangen (Matura-Audio-Streaming)"
                   Target="[INSTALLFOLDER]LiveStreamSound.exe"
-                  WorkingDirectory="INSTALLFOLDER" />
+                  WorkingDirectory="INSTALLFOLDER"
+                  Icon="app.ico" />
         <RemoveFolder Id="RemoveShortcutFolder" On="uninstall" />
-        <!-- HKCU is required here: the shortcut lives in a per-user location, and
-             WiX ICE38/43/57 enforce that the component's KeyPath be per-user too. -->
-        <RegistryValue Root="HKCU" Key="Software\LiveStreamSound" Name="installed"
+        <RegistryValue Root="HKCU" Key="Software\LiveStreamSound" Name="installed_startmenu"
+                       Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <!-- Desktop shortcut, also visible to all users (CommonDesktopFolder). -->
+    <ComponentGroup Id="DesktopShortcuts" Directory="CommonDesktopFolder">
+      <Component Id="DesktopShortcut" Guid="7E4D2F11-19B8-4F9F-9A0D-33B1C2F1B303">
+        <Shortcut Id="DesktopShortcutItem"
+                  Name="LiveStreamSound"
+                  Description="Ton kabellos senden oder empfangen (Matura-Audio-Streaming)"
+                  Target="[INSTALLFOLDER]LiveStreamSound.exe"
+                  WorkingDirectory="INSTALLFOLDER"
+                  Icon="app.ico" />
+        <RegistryValue Root="HKCU" Key="Software\LiveStreamSound" Name="installed_desktop"
                        Type="integer" Value="1" KeyPath="yes" />
       </Component>
     </ComponentGroup>
 
     <!--
-      Firewall rules cover all three ports the app uses:
+      Firewall rules cover all three ports the app uses — machine-wide so every user
+      account on the laptop benefits:
         TCP 5000 — host control channel
-        UDP 5001 — host audio stream (out from host, in at clients)
-        TCP 5002 — idle-client listener for host-initiated invitations
+        UDP 5001 — host audio stream
+        TCP 5002 — idle-client invite listener
     -->
     <ComponentGroup Id="AppFirewall" Directory="INSTALLFOLDER">
       <Component Id="AppFirewallRules" Guid="7E4D2F11-19B8-4F9F-9A0D-33B1C2F1B302" KeyPath="yes">
