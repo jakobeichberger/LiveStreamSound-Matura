@@ -35,8 +35,9 @@
       <Directory Id="ShortcutFolder" Name="LiveStreamSound" />
     </StandardDirectory>
 
-    <!-- CommonDesktopFolder = %PUBLIC%\Desktop, visible for every user on the machine. -->
-    <StandardDirectory Id="CommonDesktopFolder" />
+    <!-- DesktopFolder resolves to %PUBLIC%\Desktop under perMachine scope,
+         so this shortcut is visible for every account on the laptop. -->
+    <StandardDirectory Id="DesktopFolder" />
 
     <!-- Start Menu shortcut (per-user KeyPath required by ICE38/43/57 even on per-machine scope). -->
     <ComponentGroup Id="StartMenuShortcuts" Directory="ShortcutFolder">
@@ -54,7 +55,7 @@
     </ComponentGroup>
 
     <!-- Desktop shortcut, also visible to all users (CommonDesktopFolder). -->
-    <ComponentGroup Id="DesktopShortcuts" Directory="CommonDesktopFolder">
+    <ComponentGroup Id="DesktopShortcuts" Directory="DesktopFolder">
       <Component Id="DesktopShortcut" Guid="7E4D2F11-19B8-4F9F-9A0D-33B1C2F1B303">
         <Shortcut Id="DesktopShortcutItem"
                   Name="LiveStreamSound"
