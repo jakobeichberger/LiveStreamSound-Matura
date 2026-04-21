@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ADMX template to toggle the LiveStreamSound firewall rules via Group Policy
+  (Computer Config → Administrative Templates → LiveStreamSound).
+
+  This is a thin wrapper: enabling the policy instructs a GPO startup script
+  to run Add-LiveStreamSoundFirewallRules.ps1. The actual rule creation
+  lives in the PowerShell file, which is what you point the startup script at.
+
+  Place this file in \\<domain>\SYSVOL\<domain>\policies\PolicyDefinitions\
+  together with LiveStreamSound-Firewall.adml (English) so GPMC shows the
+  policy in the admin template tree.
+-->
+<policyDefinitions revision="1.0" schemaVersion="1.0"
+                   xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions"
+                   xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <policyNamespaces>
+    <target prefix="livestreamsound" namespace="LiveStreamSound.Firewall.Policies" />
+  </policyNamespaces>
+  <resources minRequiredRevision="1.0" />
+  <categories>
+    <category name="LiveStreamSound" displayName="$(string.LiveStreamSoundCategory)">
+      <parentCategory ref="windows:Windows" />
+    </category>
+  </categories>
+  <policies>
+    <policy name="EnableFirewallRules"
+            class="Machine"
+            displayName="$(string.EnableFirewallRules)"
+            explainText="$(string.EnableFirewallRules_Explain)"
+            key="Software\Policies\LiveStreamSound"
+            valueName="FirewallRulesEnabled">
+      <parentCategory ref="LiveStreamSound" />
+      <supportedOn ref="windows:SUPPORTED_WindowsVista" />
+      <enabledValue><decimal value="1" /></enabledValue>
+      <disabledValue><decimal value="0" /></disabledValue>
+    </policy>
+  </policies>
+</policyDefinitions>

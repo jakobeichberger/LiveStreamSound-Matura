@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<policyDefinitionResources revision="1.0" schemaVersion="1.0"
+                           xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions"
+                           xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <displayName>LiveStreamSound Firewall</displayName>
+  <description>Group-Policy hook that signals the LiveStreamSound firewall rules should be present on the target machine.</description>
+  <resources>
+    <stringTable>
+      <string id="LiveStreamSoundCategory">LiveStreamSound</string>
+      <string id="EnableFirewallRules">Enable LiveStreamSound firewall rules</string>
+      <string id="EnableFirewallRules_Explain">When enabled, a registry marker is set that the GPO startup script (Add-LiveStreamSoundFirewallRules.ps1) uses to ensure the three inbound rules (TCP 5000, UDP 5001, TCP 5002) exist on this machine. Disable to signal removal via Remove-LiveStreamSoundFirewallRules.ps1.
+
+These rules are also created automatically by the LiveStreamSound MSI installer; this policy is only useful if you want to pre-create the rules on machines that don't yet have the MSI installed.</string>
+    </stringTable>
+  </resources>
+</policyDefinitionResources>

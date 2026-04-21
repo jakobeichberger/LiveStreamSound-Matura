@@ -125,6 +125,10 @@ Kurz:
 4. Install-args: `/quiet /norestart`, Assignment als Required oder Available
 5. Upgrades laufen via `MajorUpgrade`, Uninstall ist sauber (Firewall-Regeln + Event-Log-Source + Registry werden mit entfernt)
 
+### Firewall-Rollout via GPO
+
+Der MSI legt die Firewall-Regeln selbst an. Wer die Regeln **vor** der App-Installation auf den Raum-PCs haben will (z.B. AD-Schul-Umgebung, Intune Proactive Remediation, oder ADMX-Template für Admins), findet fertige Artefakte unter [deployment/](deployment/) und einen step-by-step-Guide in [docs/gpo-firewall-deployment.md](docs/gpo-firewall-deployment.md).
+
 ## Netzwerk-Ports
 
 | Port | Protokoll | Zweck |
