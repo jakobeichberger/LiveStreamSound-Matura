@@ -23,8 +23,11 @@ public sealed class MDnsDiscoveryService : IDisposable
 
     public MDnsDiscoveryService(LogService log) { _log = log; }
 
+    public bool IsRunning => _sd is not null;
+
     public void Start()
     {
+        if (IsRunning) return;
         try
         {
             _mc = new MulticastService(nics => nics.Where(NetworkInterfaceFilter.IsRealLan).ToList());
@@ -39,6 +42,18 @@ public sealed class MDnsDiscoveryService : IDisposable
         {
             _log.Warn("mDNS", "Discovery failed (manual IP entry still works)", ex);
         }
+    }
+
+    /// <summary>Stop browsing. Service is reusable — call Start() again to resume.</summary>
+    public void Stop()
+    {
+        try { _sd?.Dispose(); } catch { }
+        try { _mc?.Dispose(); } catch { }
+        _sd = null;
+        _mc = null;
+        lock (_lock) _hosts.Clear();
+        Notify();
+        _log.Info("mDNS", "Discovery stopped");
     }
 
     private void OnServiceInstanceDiscovered(object? sender, ServiceInstanceDiscoveryEventArgs e)

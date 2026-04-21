@@ -36,13 +36,19 @@ public sealed class IdleListenerService : IAsyncDisposable
 
     public IdleListenerService(LogService log) { _log = log; }
 
+    /// <summary>The dynamic TCP port this listener bound to (0 until Start succeeds).</summary>
+    public int BoundPort { get; private set; }
+
     public void Start(string clientFriendlyName)
     {
         if (_running) return;
         try
         {
-            _listener = new TcpListener(IPAddress.Any, DiscoveryConstants.DefaultIdleClientPort);
+            // Bind to OS-assigned dynamic port; clients don't need a fixed port
+            // since hosts discover them via mDNS SRV records which carry the port.
+            _listener = new TcpListener(IPAddress.Any, 0);
             _listener.Start();
+            BoundPort = ((IPEndPoint)_listener.LocalEndpoint).Port;
 
             _mc = new MulticastService(nics => nics.Where(NetworkInterfaceFilter.IsRealLan).ToList());
             _sd = new ServiceDiscovery(_mc);
@@ -50,7 +56,7 @@ public sealed class IdleListenerService : IAsyncDisposable
             var profile = new ServiceProfile(
                 instanceName: Environment.MachineName,
                 serviceName: DiscoveryConstants.MDnsClientServiceType,
-                port: (ushort)DiscoveryConstants.DefaultIdleClientPort);
+                port: (ushort)BoundPort);
             profile.AddProperty(DiscoveryConstants.TxtVersionKey, DiscoveryConstants.ProtocolVersion.ToString());
             profile.AddProperty(DiscoveryConstants.TxtSessionNameKey, clientFriendlyName);
             _sd.Advertise(profile);
@@ -59,7 +65,7 @@ public sealed class IdleListenerService : IAsyncDisposable
             _acceptLoop = Task.Run(() => AcceptLoopAsync(_cts.Token));
             _running = true;
             _log.Info("IdleListener",
-                $"Listening on TCP {DiscoveryConstants.DefaultIdleClientPort}; advertised as '{clientFriendlyName}'");
+                $"Listening on TCP {BoundPort}; advertised as '{clientFriendlyName}'");
         }
         catch (Exception ex)
         {

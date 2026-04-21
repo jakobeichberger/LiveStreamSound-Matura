@@ -60,17 +60,19 @@ public sealed class HostOrchestrator : IAsyncDisposable
         var started = 0;
         try
         {
-            Control.Start(DiscoveryConstants.DefaultControlPort);
+            Control.Start(DiscoveryConstants.DefaultControlPort);  // may auto-pick higher
             started++;
-            AudioServer.Start(DiscoveryConstants.DefaultAudioPort);
+            AudioServer.Start(DiscoveryConstants.DefaultAudioPort);  // may auto-pick higher
             started++;
+            // Wire the actual audio port into ControlServer so WELCOME is correct.
+            Control.AudioPort = AudioServer.Port;
             MDns.Advertise(
                 instanceName: $"LiveStreamSound-{Environment.MachineName}",
-                controlPort: DiscoveryConstants.DefaultControlPort,
+                controlPort: Control.Port,
                 sessionName: sessionName ?? Environment.MachineName);
             Capture.Start();
             started++;
-            Log.Info("Orchestrator", $"Session ready. Clients: {LocalIp}:{DiscoveryConstants.DefaultControlPort}, code={code}");
+            Log.Info("Orchestrator", $"Session ready. Clients: {LocalIp}:{Control.Port}, audio {AudioServer.Port}, code={code}");
             return code;
         }
         catch (Exception ex)
