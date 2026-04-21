@@ -70,6 +70,14 @@ public sealed class StringHasContentConverter : IValueConverter
         throw new NotSupportedException();
 }
 
+public sealed class FloatToPercentConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        value is float f ? (double)Math.Round(f * 100) : 0d;
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        value is double d ? (float)(d / 100.0) : 0f;
+}
+
 public sealed class LogLevelToBrushConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => value switch

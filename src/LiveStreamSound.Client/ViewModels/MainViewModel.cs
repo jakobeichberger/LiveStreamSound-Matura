@@ -214,6 +214,13 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand] private void ToggleLog() => IsLogOpen = !IsLogOpen;
 
     [RelayCommand]
+    private void CloseSidePanels()
+    {
+        IsHelpOpen = false;
+        IsLogOpen = false;
+    }
+
+    [RelayCommand]
     private void OpenLogFolder()
     {
         try { System.Diagnostics.Process.Start("explorer.exe", _orchestrator.Log.LogDirectory); }

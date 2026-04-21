@@ -208,6 +208,14 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand] private void ToggleLog() => IsLogOpen = !IsLogOpen;
 
     [RelayCommand]
+    private void CloseSidePanels()
+    {
+        IsHelpOpen = false;
+        IsLogOpen = false;
+        HasStartupError = false;
+    }
+
+    [RelayCommand]
     private void OpenLogFolder()
     {
         try

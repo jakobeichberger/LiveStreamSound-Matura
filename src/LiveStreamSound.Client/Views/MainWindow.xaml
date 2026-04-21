@@ -13,6 +13,7 @@
                  WindowBackdropType="Mica">
     <ui:FluentWindow.Resources>
         <conv:QualityLevelToBrushConverter x:Key="QualityBrush"/>
+        <conv:QualityLevelToIconConverter x:Key="QualityIcon"/>
         <conv:QualityLevelToLocalizedStringConverter x:Key="QualityLabel"/>
         <conv:LogLevelToBrushConverter x:Key="LogBrush"/>
         <conv:BoolToVisibilityConverter x:Key="BoolToVis"/>
@@ -20,6 +21,10 @@
         <conv:StringToVisibilityConverter x:Key="HasStringToVis"/>
         <conv:StringHasContentConverter x:Key="HasString"/>
     </ui:FluentWindow.Resources>
+
+    <ui:FluentWindow.InputBindings>
+        <KeyBinding Key="Escape" Command="{Binding CloseSidePanelsCommand}" />
+    </ui:FluentWindow.InputBindings>
 
     <Grid>
         <Grid.RowDefinitions>
@@ -43,16 +48,21 @@
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <ui:Button Icon="{ui:SymbolIcon LocalLanguage24}"
                            Content="{Binding [Language], Source={x:Static loc:Loc.Instance}}"
+                           ToolTip="{Binding [A11y.LanguageToggle], Source={x:Static loc:Loc.Instance}}"
+                           AutomationProperties.Name="{Binding [A11y.LanguageToggle], Source={x:Static loc:Loc.Instance}}"
                            Command="{Binding ToggleLanguageCommand}" Margin="0,0,8,0"/>
                 <ui:Button Icon="{ui:SymbolIcon DarkTheme24}"
                            Command="{Binding ToggleThemeCommand}" Margin="0,0,8,0"
-                           ToolTip="{Binding [Theme], Source={x:Static loc:Loc.Instance}}"/>
+                           ToolTip="{Binding [A11y.ThemeToggle], Source={x:Static loc:Loc.Instance}}"
+                           AutomationProperties.Name="{Binding [A11y.ThemeToggle], Source={x:Static loc:Loc.Instance}}"/>
                 <ui:Button Icon="{ui:SymbolIcon QuestionCircle24}"
                            Command="{Binding ToggleHelpCommand}" Margin="0,0,8,0"
-                           ToolTip="{Binding [Help], Source={x:Static loc:Loc.Instance}}"/>
+                           ToolTip="{Binding [A11y.HelpButton], Source={x:Static loc:Loc.Instance}}"
+                           AutomationProperties.Name="{Binding [A11y.HelpButton], Source={x:Static loc:Loc.Instance}}"/>
                 <ui:Button Icon="{ui:SymbolIcon DocumentError24}"
                            Command="{Binding ToggleLogCommand}"
-                           ToolTip="{Binding [Log], Source={x:Static loc:Loc.Instance}}"/>
+                           ToolTip="{Binding [A11y.LogButton], Source={x:Static loc:Loc.Instance}}"
+                           AutomationProperties.Name="{Binding [A11y.LogButton], Source={x:Static loc:Loc.Instance}}"/>
             </StackPanel>
         </Border>
 
@@ -201,6 +211,8 @@
                             <TextBlock Text="{Binding [HelpClient.Title], Source={x:Static loc:Loc.Instance}}"
                                        FontSize="20" FontWeight="SemiBold"/>
                             <ui:Button Icon="{ui:SymbolIcon DismissCircle24}" HorizontalAlignment="Right"
+                                       ToolTip="{Binding [A11y.ClosePanel], Source={x:Static loc:Loc.Instance}}"
+                                       AutomationProperties.Name="{Binding [A11y.ClosePanel], Source={x:Static loc:Loc.Instance}}"
                                        Command="{Binding ToggleHelpCommand}" Appearance="Transparent"/>
                         </Grid>
                         <TextBlock Margin="0,16,0,4" TextWrapping="Wrap" Text="{Binding [HelpClient.Step1], Source={x:Static loc:Loc.Instance}}"/>
@@ -227,6 +239,8 @@
                         <TextBlock Text="{Binding [Log], Source={x:Static loc:Loc.Instance}}"
                                    FontSize="20" FontWeight="SemiBold"/>
                         <ui:Button Icon="{ui:SymbolIcon DismissCircle24}" HorizontalAlignment="Right"
+                                   ToolTip="{Binding [A11y.ClosePanel], Source={x:Static loc:Loc.Instance}}"
+                                   AutomationProperties.Name="{Binding [A11y.ClosePanel], Source={x:Static loc:Loc.Instance}}"
                                    Command="{Binding ToggleLogCommand}" Appearance="Transparent"/>
                     </Grid>
                     <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,8,0,8">
@@ -275,8 +289,11 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <Ellipse Grid.Column="0" Grid.Row="0" Width="12" Height="12" VerticalAlignment="Center" Margin="0,0,8,0"
-                         Fill="{Binding Quality.Level, Converter={StaticResource QualityBrush}}"/>
+                <ui:SymbolIcon Grid.Column="0" Grid.Row="0" VerticalAlignment="Center" Margin="0,0,8,0"
+                               FontSize="16"
+                               Symbol="{Binding Quality.Level, Converter={StaticResource QualityIcon}}"
+                               Foreground="{Binding Quality.Level, Converter={StaticResource QualityBrush}}"
+                               AutomationProperties.Name="{Binding Quality.Level, Converter={StaticResource QualityLabel}}"/>
                 <StackPanel Grid.Column="1" Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock Text="{Binding Quality.Level, Converter={StaticResource QualityLabel}}" FontWeight="SemiBold"/>
                     <TextBlock Margin="12,0,0,0" Opacity="0.7">

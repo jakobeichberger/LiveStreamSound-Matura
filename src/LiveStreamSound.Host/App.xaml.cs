@@ -11,7 +11,9 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-        ApplicationThemeManager.Apply(ApplicationTheme.Dark);
+        var system = ApplicationThemeManager.GetSystemTheme();
+        var initial = system == SystemTheme.Light ? ApplicationTheme.Light : ApplicationTheme.Dark;
+        ApplicationThemeManager.Apply(initial);
     }
 
     protected override async void OnExit(ExitEventArgs e)

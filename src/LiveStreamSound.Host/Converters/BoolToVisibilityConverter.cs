@@ -55,3 +55,13 @@ public sealed class IntToVisibilityConverter : IValueConverter
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
         throw new NotSupportedException();
 }
+
+/// <summary>0.0-1.0 float ↔ 0-100 double for sliders. Keeps the model in float while the UI
+/// presents percent — also makes the UIA value announcement correct.</summary>
+public sealed class FloatToPercentConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        value is float f ? (double)Math.Round(f * 100) : 0d;
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        value is double d ? (float)(d / 100.0) : 0f;
+}

@@ -93,6 +93,8 @@ public sealed class Loc : INotifyPropertyChanged
         ["Host.NoClients"] = new("Noch keine Clients verbunden.", "No clients connected yet."),
         ["Host.Volume"] = new("Lautstärke", "Volume"),
         ["Host.Mute"] = new("Stumm", "Mute"),
+        ["Host.MuteOn"] = new("Stumm (tippen zum Aufheben)", "Muted (tap to unmute)"),
+        ["Host.MuteOff"] = new("Ton an (tippen zum Stummschalten)", "Sound on (tap to mute)"),
         ["Host.OutputDevice"] = new("Ausgabegerät", "Output device"),
         ["Host.Kick"] = new("Client trennen", "Kick client"),
         ["Host.CapturingAudio"] = new("Audio-Aufnahme aktiv", "Audio capture active"),
@@ -144,6 +146,21 @@ public sealed class Loc : INotifyPropertyChanged
         // Client: discovered hosts list
         ["Client.PickHost"] = new("Einen Host auswählen oder IP eingeben", "Pick a host or enter an IP"),
         ["Client.NoHostsFound"] = new("Keine Hosts automatisch gefunden. Bitte IP manuell eintragen (siehe unten).", "No hosts found automatically. Please enter the IP manually below."),
+
+        // Accessibility names for icon-only buttons and meaningful graphics
+        ["A11y.LanguageToggle"] = new("Sprache wechseln", "Change language"),
+        ["A11y.ThemeToggle"] = new("Design wechseln (hell/dunkel)", "Change theme (light/dark)"),
+        ["A11y.HelpButton"] = new("Hilfe öffnen oder schließen", "Open or close help"),
+        ["A11y.LogButton"] = new("Fehlerlog öffnen oder schließen", "Open or close error log"),
+        ["A11y.ClosePanel"] = new("Schließen", "Close"),
+        ["A11y.KickClient"] = new("Diesen Client trennen", "Disconnect this client"),
+        ["A11y.QrCode"] = new("QR-Code mit Verbindungs-Link zum Sitzungs-Host", "QR code containing session host link"),
+        ["A11y.QualityGood"] = new("Verbindung gut", "Connection good"),
+        ["A11y.QualityDegraded"] = new("Verbindung eingeschränkt", "Connection degraded"),
+        ["A11y.QualityBad"] = new("Verbindung gestört", "Connection poor"),
+        ["A11y.QualityDisconnected"] = new("Verbindung getrennt", "Disconnected"),
+        ["A11y.VolumeSlider"] = new("Lautstärke in Prozent", "Volume in percent"),
+        ["A11y.SessionCode"] = new("Sechsstelliger Sitzungscode", "Six-digit session code"),
 
         // Client
         ["Client.DiscoveredHosts"] = new("Gefundene Hosts", "Discovered hosts"),
