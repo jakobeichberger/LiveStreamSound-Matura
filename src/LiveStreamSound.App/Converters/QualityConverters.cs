@@ -1,10 +1,10 @@
 using System.Globalization;
-using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media;
 using LiveStreamSound.Shared.Diagnostics;
+using Wpf.Ui.Controls;
 
-namespace LiveStreamSound.Client.Converters;
+namespace LiveStreamSound.App.Converters;
 
 public sealed class QualityLevelToBrushConverter : IValueConverter
 {
@@ -21,51 +21,26 @@ public sealed class QualityLevelToBrushConverter : IValueConverter
         throw new NotSupportedException();
 }
 
+public sealed class QualityLevelToIconConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        value is QualityLevel q ? q switch
+        {
+            QualityLevel.Good => SymbolRegular.CheckmarkCircle24,
+            QualityLevel.Degraded => SymbolRegular.AlertUrgent24,
+            QualityLevel.Bad => SymbolRegular.ErrorCircle24,
+            QualityLevel.Disconnected => SymbolRegular.PlugDisconnected24,
+            _ => SymbolRegular.CircleSmall24,
+        } : SymbolRegular.CircleSmall24;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
 public sealed class QualityLevelToLocalizedStringConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
         value is QualityLevel q ? q.LocalizedLabel() : "";
-    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-        throw new NotSupportedException();
-}
-
-public sealed class BoolToVisibilityConverter : IValueConverter
-{
-    public bool Inverted { get; set; }
-    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-    {
-        var b = value is bool x && x;
-        if (Inverted) b = !b;
-        return b ? Visibility.Visible : Visibility.Collapsed;
-    }
-    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-        value is Visibility v && (v == Visibility.Visible ^ Inverted);
-}
-
-public sealed class BoolInverterConverter : IValueConverter
-{
-    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-        value is bool b ? !b : true;
-    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-        value is bool b ? !b : true;
-}
-
-public sealed class StringToVisibilityConverter : IValueConverter
-{
-    public bool VisibleWhenEmpty { get; set; }
-    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-    {
-        var isEmpty = string.IsNullOrEmpty(value as string);
-        return (VisibleWhenEmpty ? isEmpty : !isEmpty) ? Visibility.Visible : Visibility.Collapsed;
-    }
-    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-        throw new NotSupportedException();
-}
-
-public sealed class StringHasContentConverter : IValueConverter
-{
-    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-        !string.IsNullOrEmpty(value as string);
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
         throw new NotSupportedException();
 }

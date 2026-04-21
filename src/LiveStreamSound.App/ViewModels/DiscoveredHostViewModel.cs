@@ -2,7 +2,7 @@ using System.Net;
 using CommunityToolkit.Mvvm.ComponentModel;
 using LiveStreamSound.Client.Services;
 
-namespace LiveStreamSound.Client.ViewModels;
+namespace LiveStreamSound.App.ViewModels;
 
 public partial class DiscoveredHostViewModel : ObservableObject
 {
@@ -26,7 +26,6 @@ public partial class DiscoveredHostViewModel : ObservableObject
 
     private static string ExtractShortName(string instanceName)
     {
-        // "LiveStreamSound-HOSTNAME._livestreamsound._tcp.local" → "HOSTNAME"
         var dot = instanceName.IndexOf('.');
         var raw = dot > 0 ? instanceName[..dot] : instanceName;
         const string prefix = "LiveStreamSound-";

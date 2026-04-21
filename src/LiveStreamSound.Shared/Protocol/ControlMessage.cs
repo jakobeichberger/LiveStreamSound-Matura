@@ -16,4 +16,6 @@ namespace LiveStreamSound.Shared.Protocol;
 [JsonDerivedType(typeof(Pong), "pong")]
 [JsonDerivedType(typeof(ClientStatus), "clientStatus")]
 [JsonDerivedType(typeof(SessionEnding), "sessionEnding")]
+[JsonDerivedType(typeof(Invitation), "invitation")]
+[JsonDerivedType(typeof(InvitationResponse), "invitationResponse")]
 public abstract record ControlMessage;

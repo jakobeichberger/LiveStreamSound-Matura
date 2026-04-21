@@ -93,6 +93,8 @@ public sealed class Loc : INotifyPropertyChanged
         ["Host.NoClients"] = new("Noch keine Clients verbunden.", "No clients connected yet."),
         ["Host.Volume"] = new("Lautstärke", "Volume"),
         ["Host.Mute"] = new("Stumm", "Mute"),
+        ["Host.MuteOn"] = new("Stumm (tippen zum Aufheben)", "Muted (tap to unmute)"),
+        ["Host.MuteOff"] = new("Ton an (tippen zum Stummschalten)", "Sound on (tap to mute)"),
         ["Host.OutputDevice"] = new("Ausgabegerät", "Output device"),
         ["Host.Kick"] = new("Client trennen", "Kick client"),
         ["Host.CapturingAudio"] = new("Audio-Aufnahme aktiv", "Audio capture active"),
@@ -144,6 +146,57 @@ public sealed class Loc : INotifyPropertyChanged
         // Client: discovered hosts list
         ["Client.PickHost"] = new("Einen Host auswählen oder IP eingeben", "Pick a host or enter an IP"),
         ["Client.NoHostsFound"] = new("Keine Hosts automatisch gefunden. Bitte IP manuell eintragen (siehe unten).", "No hosts found automatically. Please enter the IP manually below."),
+
+        // Accessibility names for icon-only buttons and meaningful graphics
+        ["A11y.LanguageToggle"] = new("Sprache wechseln", "Change language"),
+        ["A11y.ThemeToggle"] = new("Design wechseln (hell/dunkel)", "Change theme (light/dark)"),
+        ["A11y.HelpButton"] = new("Hilfe öffnen oder schließen", "Open or close help"),
+        ["A11y.LogButton"] = new("Fehlerlog öffnen oder schließen", "Open or close error log"),
+        ["A11y.ClosePanel"] = new("Schließen", "Close"),
+        ["A11y.KickClient"] = new("Diesen Client trennen", "Disconnect this client"),
+        ["A11y.QrCode"] = new("QR-Code mit Verbindungs-Link zum Sitzungs-Host", "QR code containing session host link"),
+        ["A11y.QualityGood"] = new("Verbindung gut", "Connection good"),
+        ["A11y.QualityDegraded"] = new("Verbindung eingeschränkt", "Connection degraded"),
+        ["A11y.QualityBad"] = new("Verbindung gestört", "Connection poor"),
+        ["A11y.QualityDisconnected"] = new("Verbindung getrennt", "Disconnected"),
+        ["A11y.VolumeSlider"] = new("Lautstärke in Prozent", "Volume in percent"),
+        ["A11y.SessionCode"] = new("Sechsstelliger Sitzungscode", "Six-digit session code"),
+
+        // Role selection (start screen)
+        ["App.Welcome"] = new("Willkommen", "Welcome"),
+        ["App.ChooseRole"] = new("Was möchtest du tun?", "What would you like to do?"),
+        ["App.Role.SendTitle"] = new("Ton senden", "Send audio"),
+        ["App.Role.SendSubtitle"] = new(
+            "Dein Laptop ist der Host. Andere Geräte hören den Ton, den du hier abspielst (z.B. in VLC).",
+            "Your laptop is the host. Other devices play the audio you play here (e.g. in VLC)."),
+        ["App.Role.ReceiveTitle"] = new("Ton empfangen", "Receive audio"),
+        ["App.Role.ReceiveSubtitle"] = new(
+            "Dein Laptop empfängt den Ton von einem anderen Laptop und gibt ihn hier aus.",
+            "Your laptop receives audio from another laptop and plays it here."),
+        ["App.SwitchRole"] = new("Rolle wechseln…", "Change role…"),
+        ["App.SwitchRoleConfirmTitle"] = new("Rolle wechseln?", "Change role?"),
+        ["App.SwitchRoleConfirmBody"] = new(
+            "Die aktive Sitzung wird dabei getrennt.",
+            "Your active session will be disconnected."),
+        ["App.Continue"] = new("Fortfahren", "Continue"),
+
+        // Invite flow (Host → idle Client)
+        ["Invite.DialogTitle"] = new("Client einladen", "Invite client"),
+        ["Invite.IdleClients"] = new("Wartende Clients im Netzwerk", "Idle clients on the network"),
+        ["Invite.NoIdleClients"] = new("Aktuell kein wartender Client gefunden.", "No idle clients found right now."),
+        ["Invite.ManualTarget"] = new("Oder direkt per IP", "Or directly by IP"),
+        ["Invite.InvitationButton"] = new("Einladen", "Invite"),
+        ["Invite.Cancel"] = new("Abbrechen", "Cancel"),
+        ["Invite.Sending"] = new("Einladung wird gesendet…", "Sending invitation…"),
+        ["Invite.Error.Unreachable"] = new("Der Client ist nicht erreichbar. IP, Port und WLAN prüfen.", "The client is not reachable. Check IP, port and Wi-Fi."),
+        ["Invite.Error.Rejected"] = new("Der Client hat abgelehnt.", "The client declined the invitation."),
+        ["Invite.OpenInviteDialog"] = new("Client hinzufügen", "Add client"),
+
+        // Incoming invite (on the Client side)
+        ["Incoming.Title"] = new("📥 Einladung erhalten", "📥 You're invited"),
+        ["Incoming.Body"] = new("{0} (IP {1}) lädt dich in Session {2} ein.", "{0} (IP {1}) is inviting you to session {2}."),
+        ["Incoming.Accept"] = new("Annehmen", "Accept"),
+        ["Incoming.Reject"] = new("Ablehnen", "Decline"),
 
         // Client
         ["Client.DiscoveredHosts"] = new("Gefundene Hosts", "Discovered hosts"),

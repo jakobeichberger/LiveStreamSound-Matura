@@ -3,7 +3,7 @@ using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media;
 
-namespace LiveStreamSound.Host.Converters;
+namespace LiveStreamSound.App.Converters;
 
 public sealed class BoolToVisibilityConverter : IValueConverter
 {
@@ -36,21 +36,6 @@ public sealed class BoolToBrushConverter : IValueConverter
 
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
         value is bool b && b ? TrueBrush : FalseBrush;
-
-    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-        throw new NotSupportedException();
-}
-
-public sealed class IntToVisibilityConverter : IValueConverter
-{
-    /// <summary>When true, returns Visible for zero; when false, returns Visible for non-zero.</summary>
-    public bool VisibleWhenZero { get; set; }
-
-    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-    {
-        var isZero = value is int i && i == 0;
-        return (VisibleWhenZero ? isZero : !isZero) ? Visibility.Visible : Visibility.Collapsed;
-    }
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
         throw new NotSupportedException();

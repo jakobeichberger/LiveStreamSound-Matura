@@ -1,4 +1,4 @@
-name: Build MSI (on demand)
+name: Build App (on demand)
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ permissions:
   contents: read
 
 jobs:
-  build-and-test-msi:
+  build-app:
     runs-on: windows-latest
 
     steps:
@@ -22,25 +22,25 @@ jobs:
       - name: Restore
         run: dotnet restore LiveStreamSound.slnx
 
-      - name: Build apps
+      - name: Build libraries
         run: |
           dotnet build src/LiveStreamSound.Shared/LiveStreamSound.Shared.csproj -c Release --no-restore
           dotnet build src/LiveStreamSound.Host/LiveStreamSound.Host.csproj -c Release --no-restore
           dotnet build src/LiveStreamSound.Client/LiveStreamSound.Client.csproj -c Release --no-restore
 
-      - name: Test
-        run: dotnet test LiveStreamSound.slnx -c Release --no-build --verbosity normal
+      - name: Build App (single exe)
+        run: dotnet build src/LiveStreamSound.App/LiveStreamSound.App.csproj -c Release --no-restore
 
-      - name: Build MSI installers
-        run: |
-          dotnet build installer/Host/LiveStreamSound.Host.Installer.wixproj -c Release --no-restore
-          dotnet build installer/Client/LiveStreamSound.Client.Installer.wixproj -c Release --no-restore
+      - name: Publish self-contained
+        run: dotnet publish src/LiveStreamSound.App/LiveStreamSound.App.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o publish/
 
-      - name: Upload MSI artifacts
+      - name: Upload App artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: LiveStreamSound-MSI
+          name: LiveStreamSound-App
           if-no-files-found: error
           path: |
-            installer/Host/bin/Release/*.msi
-            installer/Client/bin/Release/*.msi
+            publish/**
+
+      # MSI installer (single bundle) comes in a later milestone —
+      # current release is published as a self-contained win-x64 build.

@@ -1,9 +1,9 @@
 using System.Collections.ObjectModel;
 using System.Windows;
-using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using LiveStreamSound.App.Services;
 using LiveStreamSound.Host.Services;
 using LiveStreamSound.Shared.Diagnostics;
 using LiveStreamSound.Shared.Discovery;
@@ -12,9 +12,9 @@ using LiveStreamSound.Shared.Protocol;
 using LiveStreamSound.Shared.Session;
 using Wpf.Ui.Appearance;
 
-namespace LiveStreamSound.Host.ViewModels;
+namespace LiveStreamSound.App.ViewModels;
 
-public partial class MainViewModel : ObservableObject
+public partial class HostDashboardViewModel : ObservableObject
 {
     private readonly HostOrchestrator _orchestrator;
     private readonly Dispatcher _dispatcher;
@@ -24,8 +24,6 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string? _sessionCode;
     [ObservableProperty] private string _hostIp = "?";
     [ObservableProperty] private int _controlPort = DiscoveryConstants.DefaultControlPort;
-    [ObservableProperty] private BitmapSource? _qrCode;
-    [ObservableProperty] private string _connectionUri = "";
     [ObservableProperty] private bool _audioFlowing;
     [ObservableProperty] private bool _isHelpOpen;
     [ObservableProperty] private bool _isLogOpen;
@@ -39,29 +37,30 @@ public partial class MainViewModel : ObservableObject
     public ObservableCollection<LogEntry> LogEntries { get; } = new();
     public Loc Localization => Loc.Instance;
 
-    public MainViewModel(HostOrchestrator orchestrator)
+    public HostDashboardViewModel()
     {
-        _orchestrator = orchestrator;
+        _orchestrator = AppShell.Current.Host
+            ?? throw new InvalidOperationException("HostDashboardViewModel created without active HostOrchestrator");
         _dispatcher = Dispatcher.CurrentDispatcher;
+        IsDarkTheme = ApplicationThemeManager.GetAppTheme() == ApplicationTheme.Dark;
 
         foreach (LaptopCategory cat in Enum.GetValues<LaptopCategory>())
             _groups[cat] = new ClientGroupViewModel(cat);
 
         _orchestrator.Sessions.ClientJoined += OnClientJoined;
         _orchestrator.Sessions.ClientLeft += OnClientLeft;
-        _orchestrator.Sessions.SessionStateChanged += OnSessionStateChanged;
+        _orchestrator.Sessions.SessionStateChanged += OnSessionStateChangedHandler;
         _orchestrator.Diagnostics.ClientQualityUpdated += OnClientQualityUpdated;
-        _orchestrator.Control.ClientStatusReceived += OnClientStatus;
-        _orchestrator.Log.EntryAdded += OnLogEntry;
+        _orchestrator.Control.ClientStatusReceived += OnClientStatusHandler;
+        _orchestrator.Log.EntryAdded += OnLogEntryHandler;
 
-        // Poll audio-flowing state every second (lightweight)
         var timer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Normal,
             (_, _) => AudioFlowing = _orchestrator.Pipeline.AudioFlowing,
             _dispatcher);
         timer.Start();
     }
 
-    private void OnSessionStateChanged()
+    private void OnSessionStateChangedHandler()
     {
         _dispatcher.Invoke(() =>
         {
@@ -72,8 +71,6 @@ public partial class MainViewModel : ObservableObject
             {
                 foreach (var g in _groups.Values) g.Clients.Clear();
                 ClientGroups.Clear();
-                QrCode = null;
-                ConnectionUri = "";
             }
         });
     }
@@ -82,7 +79,7 @@ public partial class MainViewModel : ObservableObject
     {
         _dispatcher.Invoke(() =>
         {
-            var vm = new ClientViewModel(c, _orchestrator.Control, _orchestrator.Sessions);
+            var vm = new ClientTileViewModel(c, _orchestrator.Control, _orchestrator.Sessions);
             vm.UpdateFromModel();
             var group = _groups[vm.Category];
             group.Clients.Add(vm);
@@ -108,25 +105,13 @@ public partial class MainViewModel : ObservableObject
         });
     }
 
-    private void OnClientQualityUpdated(ConnectedClient c)
-    {
-        _dispatcher.Invoke(() =>
-        {
-            var vm = FindVm(c.ClientId);
-            vm?.UpdateFromModel();
-        });
-    }
+    private void OnClientQualityUpdated(ConnectedClient c) =>
+        _dispatcher.Invoke(() => FindVm(c.ClientId)?.UpdateFromModel());
 
-    private void OnClientStatus(ConnectedClient c, ClientStatus status)
-    {
-        _dispatcher.Invoke(() =>
-        {
-            var vm = FindVm(c.ClientId);
-            vm?.UpdateFromModel();
-        });
-    }
+    private void OnClientStatusHandler(ConnectedClient c, ClientStatus status) =>
+        _dispatcher.Invoke(() => FindVm(c.ClientId)?.UpdateFromModel());
 
-    private ClientViewModel? FindVm(string clientId)
+    private ClientTileViewModel? FindVm(string clientId)
     {
         foreach (var g in _groups.Values)
         {
@@ -136,14 +121,12 @@ public partial class MainViewModel : ObservableObject
         return null;
     }
 
-    private void OnLogEntry(LogEntry e)
-    {
+    private void OnLogEntryHandler(LogEntry e) =>
         _dispatcher.BeginInvoke(() =>
         {
             LogEntries.Insert(0, e);
             if (LogEntries.Count > 500) LogEntries.RemoveAt(LogEntries.Count - 1);
         });
-    }
 
     [RelayCommand]
     private void StartSession()
@@ -157,9 +140,6 @@ public partial class MainViewModel : ObservableObject
             HostIp = _orchestrator.LocalIp ?? "?";
             ControlPort = DiscoveryConstants.DefaultControlPort;
             FormattedSessionCode = FormatCodeForDisplay(_orchestrator.Sessions.Code ?? "");
-            var uri = QrCodeService.BuildConnectionUri(HostIp, ControlPort, _orchestrator.Sessions.Code!);
-            ConnectionUri = uri;
-            QrCode = QrCodeService.GeneratePng(uri);
         }
         catch (SessionStartException ex)
         {
@@ -183,17 +163,11 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    private static string FormatCodeForDisplay(string code)
-    {
-        if (code.Length == 6) return $"{code[..3]} {code[3..]}";
-        return code;
-    }
+    private static string FormatCodeForDisplay(string code) =>
+        code.Length == 6 ? $"{code[..3]} {code[3..]}" : code;
 
-    [RelayCommand]
-    private async Task StopSessionAsync()
-    {
+    [RelayCommand] private async Task StopSessionAsync() =>
         await _orchestrator.StopSessionAsync();
-    }
 
     [RelayCommand] private void ToggleLanguage() => Loc.Instance.Toggle();
 
@@ -208,14 +182,34 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand] private void ToggleLog() => IsLogOpen = !IsLogOpen;
 
     [RelayCommand]
+    private void CloseSidePanels()
+    {
+        IsHelpOpen = false;
+        IsLogOpen = false;
+        HasStartupError = false;
+    }
+
+    [RelayCommand]
     private void OpenLogFolder()
     {
-        try
-        {
-            System.Diagnostics.Process.Start("explorer.exe", _orchestrator.Log.LogDirectory);
-        }
-        catch { /* ignore */ }
+        try { System.Diagnostics.Process.Start("explorer.exe", _orchestrator.Log.LogDirectory); }
+        catch { }
     }
 
     [RelayCommand] private void ClearLogView() => LogEntries.Clear();
+
+    [RelayCommand]
+    private void SwitchRole()
+    {
+        if (AppShell.Current.HasActiveSession)
+        {
+            var result = MessageBox.Show(
+                Loc.Instance.Get("App.SwitchRoleConfirmBody"),
+                Loc.Instance.Get("App.SwitchRoleConfirmTitle"),
+                MessageBoxButton.OKCancel,
+                MessageBoxImage.Warning);
+            if (result != MessageBoxResult.OK) return;
+        }
+        AppShell.Current.ShowRoleSelection();
+    }
 }

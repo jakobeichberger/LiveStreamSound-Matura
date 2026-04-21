@@ -46,3 +46,19 @@ public record ClientStatus(
 ) : ControlMessage;
 
 public record SessionEnding(string Reason) : ControlMessage;
+
+/// <summary>
+/// Sent from a Host to an idle Client on TCP DefaultIdleClientPort.
+/// The Client shows an Accept/Reject prompt and responds with <see cref="InvitationResponse"/>.
+/// On Accept the Client initiates a normal HELLO flow to the Host at HostAddress:HostControlPort,
+/// so no role reversal happens at the protocol level.
+/// </summary>
+public record Invitation(
+    string SessionCode,
+    string HostAddress,
+    int HostControlPort,
+    string HostDisplayName) : ControlMessage;
+
+public record InvitationResponse(
+    bool Accepted,
+    string? Reason) : ControlMessage;
