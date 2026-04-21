@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/installer/" />
+  <Folder Name="/installer/Client/">
+    <Project Path="installer/Client/LiveStreamSound.Client.Installer.wixproj" Type="b7dd6f7e-def8-4e67-b5b7-07ef123db6f0" />
+  </Folder>
+  <Folder Name="/installer/Host/">
+    <Project Path="installer/Host/LiveStreamSound.Host.Installer.wixproj" Type="b7dd6f7e-def8-4e67-b5b7-07ef123db6f0" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/LiveStreamSound.Client/LiveStreamSound.Client.csproj" />
+    <Project Path="src/LiveStreamSound.Host/LiveStreamSound.Host.csproj" />
+    <Project Path="src/LiveStreamSound.Shared/LiveStreamSound.Shared.csproj" />
+  </Folder>
+</Solution>

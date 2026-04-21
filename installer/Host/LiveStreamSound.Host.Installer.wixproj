@@ -1,0 +1,20 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <OutputName>LiveStreamSound-Host-$(Version)</OutputName>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <DefineConstants>HostBin=$(MSBuildThisFileDirectory)..\..\src\LiveStreamSound.Host\bin\$(Configuration)\net10.0-windows</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\LiveStreamSound.Host\LiveStreamSound.Host.csproj">
+      <Name>LiveStreamSound.Host</Name>
+    </ProjectReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" Version="5.0.2" />
+    <PackageReference Include="WixToolset.Firewall.wixext" Version="5.0.2" />
+    <PackageReference Include="WixToolset.Util.wixext" Version="5.0.2" />
+  </ItemGroup>
+</Project>

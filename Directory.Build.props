@@ -1,0 +1,11 @@
+<Project>
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Company>Jakob Eichberger</Company>
+    <Product>LiveStreamSound-Matura</Product>
+    <Version>0.1.0</Version>
+    <Copyright>Copyright (c) 2026 Jakob Eichberger</Copyright>
+  </PropertyGroup>
+</Project>

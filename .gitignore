@@ -1,0 +1,46 @@
+## .NET / VS
+bin/
+obj/
+out/
+publish/
+*.user
+*.suo
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.swp
+.vs/
+.vscode/
+*.DotSettings.user
+
+## WiX
+*.wixobj
+*.wixpdb
+*.msi
+
+## macOS
+.DS_Store
+
+## Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+## Rider / IntelliJ
+.idea/
+
+## Claude Code local settings
+.claude/settings.local.json
+
+## Local settings that shouldn't be committed
+appsettings.Development.json
+*.log
+
+## NuGet
+*.nupkg
+.nuget/
+packages/
+
+## Logs that the apps themselves write at runtime
+logs/

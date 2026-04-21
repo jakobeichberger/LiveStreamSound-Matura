@@ -1,0 +1,48 @@
+namespace LiveStreamSound.Shared.Protocol;
+
+public record Hello(
+    string Code,
+    string ClientName,
+    int ProtocolVersion
+) : ControlMessage;
+
+public record Welcome(
+    string ClientId,
+    int AudioUdpPort,
+    int SampleRate,
+    int Channels,
+    string AudioCodec,
+    long ServerTimeMs
+) : ControlMessage;
+
+public record AuthFail(string Reason) : ControlMessage;
+
+public record SetVolume(float Level) : ControlMessage;
+
+public record SetMute(bool Muted) : ControlMessage;
+
+public record ListOutputDevicesRequest : ControlMessage;
+
+public record OutputDeviceInfo(string Id, string Name, bool IsDefault);
+
+public record OutputDevicesResponse(
+    OutputDeviceInfo[] Devices,
+    string? CurrentDeviceId
+) : ControlMessage;
+
+public record SetOutputDevice(string DeviceId) : ControlMessage;
+
+public record Kick(string Reason) : ControlMessage;
+
+public record Ping(long ClientTimeMs) : ControlMessage;
+
+public record Pong(long ClientTimeMs, long ServerTimeMs) : ControlMessage;
+
+public record ClientStatus(
+    float CurrentVolume,
+    bool IsMuted,
+    string? CurrentDeviceId,
+    int BufferedMs
+) : ControlMessage;
+
+public record SessionEnding(string Reason) : ControlMessage;
