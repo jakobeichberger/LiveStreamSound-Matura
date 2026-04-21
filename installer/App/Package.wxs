@@ -6,7 +6,7 @@
 
   <Package Name="LiveStreamSound"
            Manufacturer="Jakob Eichberger"
-           Version="0.2.0.0"
+           Version="$(var.AppVersion)"
            UpgradeCode="7E4D2F11-19B8-4F9F-9A0D-33B1C2F1A010"
            Scope="perMachine"
            Compressed="yes"
@@ -86,11 +86,18 @@
         TCP 5000 — host control channel (preferred; auto-retries 5001+)
         UDP 5001 — host audio stream source
         TCP 5002 — reserved for future use (idle listener now dynamic)
+
+      The RegistryKey wrapper with ForceDeleteOnUninstall="yes" ensures the
+      whole HKLM\Software\LiveStreamSound key (and all its values written by
+      the firewall + eventlog components) is removed on uninstall — no stale
+      registry leftovers after the product is uninstalled (e.g. via Intune).
     -->
     <ComponentGroup Id="AppFirewall" Directory="INSTALLFOLDER">
       <Component Id="AppFirewallRules" Guid="7E4D2F11-19B8-4F9F-9A0D-33B1C2F1B302" KeyPath="yes">
-        <RegistryValue Root="HKLM" Key="Software\LiveStreamSound" Name="firewall"
-                       Type="integer" Value="1" />
+        <RegistryKey Root="HKLM" Key="Software\LiveStreamSound" ForceDeleteOnUninstall="yes">
+          <RegistryValue Name="firewall" Type="integer" Value="1" />
+          <RegistryValue Name="InstalledVersion" Type="string" Value="[ProductVersion]" />
+        </RegistryKey>
         <fw:FirewallException Id="LSS_TCP_Control"
                               Name="LiveStreamSound (TCP Control)"
                               Protocol="tcp"
@@ -120,6 +127,8 @@
     -->
     <ComponentGroup Id="AppEventLog" Directory="INSTALLFOLDER">
       <Component Id="AppEventLogSource" Guid="7E4D2F11-19B8-4F9F-9A0D-33B1C2F1B305">
+        <!-- Same HKLM key as AppFirewallRules — ForceDeleteOnUninstall there
+             takes care of this value too. KeyPath has to be a distinct value. -->
         <RegistryValue Root="HKLM"
                        Key="Software\LiveStreamSound"
                        Name="eventlog_registered"

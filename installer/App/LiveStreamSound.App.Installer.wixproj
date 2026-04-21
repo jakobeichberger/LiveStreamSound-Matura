@@ -8,7 +8,12 @@
       output, which includes the .NET 10 runtime alongside the app so the MSI runs on a
       freshly imaged Windows box without a separate .NET install.
     -->
-    <DefineConstants>AppPublishDir=$(MSBuildThisFileDirectory)..\..\src\LiveStreamSound.App\bin\$(Configuration)\net10.0-windows\win-x64\publish\</DefineConstants>
+    <!--
+      AppVersion is forwarded to Package.wxs so the MSI ProductVersion tracks
+      whatever MSBuild-level Version was set (from git tag in CI, or the
+      Directory.Build.props default for local builds).
+    -->
+    <DefineConstants>AppPublishDir=$(MSBuildThisFileDirectory)..\..\src\LiveStreamSound.App\bin\$(Configuration)\net10.0-windows\win-x64\publish\;AppVersion=$(Version)</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
