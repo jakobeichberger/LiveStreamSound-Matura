@@ -15,6 +15,7 @@ public sealed class MDnsDiscoveryService : IDisposable
 {
     private readonly LogService _log;
     private ServiceDiscovery? _sd;
+    private MulticastService? _mc;
     private readonly Dictionary<string, DiscoveredHost> _hosts = new();
     private readonly object _lock = new();
 
@@ -26,9 +27,11 @@ public sealed class MDnsDiscoveryService : IDisposable
     {
         try
         {
-            _sd = new ServiceDiscovery();
+            _mc = new MulticastService(nics => nics.Where(NetworkInterfaceFilter.IsRealLan).ToList());
+            _sd = new ServiceDiscovery(_mc);
             _sd.ServiceInstanceDiscovered += OnServiceInstanceDiscovered;
             _sd.ServiceInstanceShutdown += OnServiceInstanceShutdown;
+            _mc.Start();
             _sd.QueryServiceInstances(DiscoveryConstants.MDnsServiceType);
             _log.Info("mDNS", $"Browsing for {DiscoveryConstants.MDnsServiceType}");
         }
@@ -43,6 +46,11 @@ public sealed class MDnsDiscoveryService : IDisposable
         try
         {
             var instanceName = e.ServiceInstanceName.ToString();
+            // Makaretu fires this for every mDNS instance on the network regardless
+            // of our specific Query. Skip anything that isn't ours.
+            if (!instanceName.Contains(DiscoveryConstants.MDnsServiceType, StringComparison.OrdinalIgnoreCase))
+                return;
+
             var records = e.Message.Answers.Concat(e.Message.AdditionalRecords).ToList();
 
             var srv = records.OfType<SRVRecord>()
@@ -122,6 +130,8 @@ public sealed class MDnsDiscoveryService : IDisposable
     public void Dispose()
     {
         try { _sd?.Dispose(); } catch { }
+        try { _mc?.Dispose(); } catch { }
         _sd = null;
+        _mc = null;
     }
 }

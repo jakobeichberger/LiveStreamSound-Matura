@@ -18,4 +18,5 @@ namespace LiveStreamSound.Shared.Protocol;
 [JsonDerivedType(typeof(SessionEnding), "sessionEnding")]
 [JsonDerivedType(typeof(Invitation), "invitation")]
 [JsonDerivedType(typeof(InvitationResponse), "invitationResponse")]
+[JsonDerivedType(typeof(AudioClientReady), "audioClientReady")]
 public abstract record ControlMessage;

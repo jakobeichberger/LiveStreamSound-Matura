@@ -55,21 +55,22 @@ public sealed class ClientOrchestrator : IAsyncDisposable
 
     public async Task<bool> ConnectAsync(IPAddress host, int controlPort, string code, string displayName, CancellationToken ct = default)
     {
-        // While connected we shouldn't still accept invitations from other hosts.
-        await IdleListener.StopAsync().ConfigureAwait(false);
+        // NOTE: We deliberately do NOT stop IdleListener here — doing so races with
+        // the in-flight InvitationResponse write (host sees `null` on the invite
+        // socket). Instead the state-change handler below stops the listener when
+        // the TCP control channel actually reaches Connected.
 
         var welcome = await Control.ConnectAsync(host, controlPort, code, displayName, ct);
-        if (welcome is null)
-        {
-            // Reconnect-to-idle so the user can still be invited.
-            IdleListener.Start(SuggestedDisplayName);
-            return false;
-        }
+        if (welcome is null) return false;
 
         try
         {
-            await AudioIn.StartAsync(welcome.AudioUdpPort);
+            // Ephemeral UDP port — lets host+client coexist on one machine.
+            await AudioIn.StartAsync(port: 0);
             Playback.Start();
+
+            // Tell the host our actual bound port so it fans-out audio to us.
+            await Control.SendAsync(new AudioClientReady(AudioIn.Port), ct);
         }
         catch (Exception ex)
         {
@@ -100,7 +101,13 @@ public sealed class ClientOrchestrator : IAsyncDisposable
 
     private void OnStateChanged(ControlClientState s)
     {
-        if (s == ControlClientState.Disconnected || s == ControlClientState.Failed)
+        if (s == ControlClientState.Connected)
+        {
+            // Only stop idle-listener once the handshake is actually live. By now
+            // the InvitationResponse has had time to flush out on the invite socket.
+            _ = IdleListener.StopAsync();
+        }
+        else if (s == ControlClientState.Disconnected || s == ControlClientState.Failed)
         {
             StopPumps();
             _ = AudioIn.Stop();

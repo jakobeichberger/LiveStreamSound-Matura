@@ -30,15 +30,18 @@ public sealed class AudioStreamClient : IAsyncDisposable
         _log = log;
     }
 
-    public async Task StartAsync(int port)
+    public async Task StartAsync(int port = 0)
     {
         await Stop().ConfigureAwait(false);
-        Port = port;
-        _udp = new UdpClient(port);
+        // port = 0 → ephemeral (OS-picked) so multiple clients on the same
+        // machine don't collide with a host-bound 5001.
+        _udp = new UdpClient(new System.Net.IPEndPoint(System.Net.IPAddress.Any, port));
         _udp.Client.ReceiveBufferSize = 1 << 18;
+        var bound = (System.Net.IPEndPoint)_udp.Client.LocalEndPoint!;
+        Port = bound.Port;
         _cts = new CancellationTokenSource();
         _loop = Task.Run(() => ReceiveLoopAsync(_cts.Token));
-        _log.Info("AudioStreamClient", $"Listening on UDP {port}");
+        _log.Info("AudioStreamClient", $"Listening on UDP {Port} (requested {port})");
     }
 
     private async Task ReceiveLoopAsync(CancellationToken ct)

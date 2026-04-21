@@ -19,6 +19,7 @@ public sealed class IdleClientDiscoveryService : IDisposable
 {
     private readonly LogService _log;
     private ServiceDiscovery? _sd;
+    private MulticastService? _mc;
     private readonly Dictionary<string, DiscoveredIdleClient> _clients = new();
     private readonly object _lock = new();
 
@@ -35,9 +36,11 @@ public sealed class IdleClientDiscoveryService : IDisposable
     {
         try
         {
-            _sd = new ServiceDiscovery();
+            _mc = new MulticastService(nics => nics.Where(NetworkInterfaceFilter.IsRealLan).ToList());
+            _sd = new ServiceDiscovery(_mc);
             _sd.ServiceInstanceDiscovered += OnInstanceDiscovered;
             _sd.ServiceInstanceShutdown += OnInstanceShutdown;
+            _mc.Start();
             _sd.QueryServiceInstances(DiscoveryConstants.MDnsClientServiceType);
             _log.Info("IdleClientDiscovery", $"Browsing for {DiscoveryConstants.MDnsClientServiceType}");
         }
@@ -52,6 +55,9 @@ public sealed class IdleClientDiscoveryService : IDisposable
         try
         {
             var instance = e.ServiceInstanceName.ToString();
+            if (!instance.Contains(DiscoveryConstants.MDnsClientServiceType, StringComparison.OrdinalIgnoreCase))
+                return;
+
             var records = e.Message.Answers.Concat(e.Message.AdditionalRecords).ToList();
 
             var srv = records.OfType<SRVRecord>()
@@ -111,6 +117,8 @@ public sealed class IdleClientDiscoveryService : IDisposable
     public void Dispose()
     {
         try { _sd?.Dispose(); } catch { }
+        try { _mc?.Dispose(); } catch { }
         _sd = null;
+        _mc = null;
     }
 }

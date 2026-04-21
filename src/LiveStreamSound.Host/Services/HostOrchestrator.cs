@@ -44,7 +44,11 @@ public sealed class HostOrchestrator : IAsyncDisposable
 
         Capture.FrameAvailable += OnPcmFrame;
         Capture.CaptureError += ex => Log.Error("Capture", "Recording error", ex);
-        Sessions.ClientJoined += c => AudioServer.AssignAudioEndpointFromTcp(c, DiscoveryConstants.DefaultAudioPort);
+        // NOTE: the client sends AudioClientReady over TCP with its actual bound
+        // UDP port after HELLO. That message updates client.AudioEndpoint with
+        // the right endpoint. We no longer assume DefaultAudioPort here so a
+        // host and client can run on the same machine without colliding on 5001.
+        Control.ClientStatusReceived += (c, _) => { /* placeholder subscription */ };
     }
 
     public string StartSession(string? sessionName = null)

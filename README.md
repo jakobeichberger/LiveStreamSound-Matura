@@ -101,9 +101,21 @@ Der MSI-Artifact kann direkt auf einen frischen Windows-PC gespielt werden — k
 | Port | Protokoll | Zweck |
 |---|---|---|
 | 5000 | TCP | Host-Control-Channel (JSON-Messages) |
-| 5001 | UDP | Host-Audio-Stream (Opus, fan-out zu jedem Client) |
+| 5001 | UDP | Host-Audio-Stream (Quelle, fan-out zu jedem Client) |
+| **ephemeral** | UDP | **Client-Audio-Empfang** (vom OS gewählt, an Host gemeldet via `AudioClientReady`) |
 | 5002 | TCP | Idle-Client-Listener (empfängt Einladungen vom Host) |
 | 5353 | UDP | mDNS (Service Discovery) |
+
+Client bindet seinen UDP-Empfangs-Port ephemeral (OS-vergeben) und teilt den Port dem Host nach dem HELLO mit — so können Host und Client auch **auf derselben Maschine** laufen, ohne dass 5001 kollidiert.
+
+## Lokal testen (beide Rollen auf einem Rechner)
+
+1. Eine Instanz starten → **Ton senden** wählen → **Sitzung starten**.
+2. Zweite Instanz derselben `.exe` starten → **Ton empfangen**.
+3. In der Client-Instanz taucht der Host in der Liste *Gefundene Hosts* auf (ggf. unter der WLAN-IP, nicht der Hyper-V-IP — virtuelle Adapter werden gefiltert).
+4. Code aus der Host-Instanz eintippen → **Verbinden**.
+
+Alternativ: die Host-Instanz kann über **Client hinzufügen** den idle-Client einladen. Beide Wege enden im selben HELLO-Flow.
 
 Der MSI fügt TCP 5000, UDP 5001, TCP 5002 automatisch zu den Windows-Firewall-Regeln hinzu (Scope: LocalSubnet).
 
