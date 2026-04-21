@@ -79,22 +79,34 @@ public sealed class DiagnosticsService : IDisposable
 }
 
 /// <summary>
-/// Tracks whether the host pipeline is currently producing audio (non-silence frames).
+/// Tracks whether the host pipeline is currently producing audio (non-silence frames)
+/// and exposes a smoothed RMS level 0.0-1.0 for UI meters.
 /// </summary>
 public sealed class AudioPipelineState
 {
     private DateTimeOffset _lastNonSilenceFrame = DateTimeOffset.MinValue;
+    private float _smoothedLevel;
+
+    /// <summary>Smoothed RMS level of the most-recent frame, 0.0 (silence) … 1.0 (full-scale).</summary>
+    public float CurrentLevel => _smoothedLevel;
 
     public void NotifyFrame(ReadOnlySpan<byte> pcm)
     {
-        // Quick silence heuristic: if all samples are near-zero, treat as silence.
-        var hasSignal = false;
-        for (var i = 0; i < pcm.Length; i += 32)
+        double sumSq = 0;
+        var count = 0;
+        // Sample every 8th byte-pair to keep this cheap at 50 fps
+        for (var i = 0; i + 1 < pcm.Length; i += 16)
         {
-            var sample = (short)(pcm[i] | (pcm[Math.Min(i + 1, pcm.Length - 1)] << 8));
-            if (Math.Abs((int)sample) > 300) { hasSignal = true; break; }
+            var s = (short)(pcm[i] | (pcm[i + 1] << 8));
+            sumSq += s * (double)s;
+            count++;
         }
-        if (hasSignal) _lastNonSilenceFrame = DateTimeOffset.Now;
+        if (count == 0) return;
+        var rms = Math.Sqrt(sumSq / count) / short.MaxValue;
+        // Light exponential smoothing so the UI meter doesn't flicker at 50 fps
+        _smoothedLevel = (float)(_smoothedLevel * 0.4 + rms * 0.6);
+
+        if (rms > 0.01) _lastNonSilenceFrame = DateTimeOffset.Now;
     }
 
     public bool AudioFlowing =>

@@ -4,6 +4,7 @@
                  xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
                  xmlns:vm="clr-namespace:LiveStreamSound.App.ViewModels"
                  xmlns:conv="clr-namespace:LiveStreamSound.App.Converters"
+                 xmlns:ctrl="clr-namespace:LiveStreamSound.App.Controls"
                  xmlns:loc="clr-namespace:LiveStreamSound.Shared.Localization;assembly=LiveStreamSound.Shared"
                  Title="LiveStreamSound — Host"
                  Width="1100" Height="720"
@@ -83,6 +84,13 @@
                         <TextBlock FontSize="16" FontFamily="Consolas">
                             <Run Text="{Binding HostIp, Mode=OneWay}"/>:<Run Text="{Binding ControlPort, Mode=OneWay}"/>
                         </TextBlock>
+                    </StackPanel>
+
+                    <StackPanel Margin="24,0,0,0" VerticalAlignment="Center"
+                                Visibility="{Binding IsSessionActive, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="Audio-Level" Opacity="0.7" FontSize="11" Margin="0,0,0,4"/>
+                        <ctrl:VuMeterControl Level="{Binding AudioLevel}" Width="96" Height="14"
+                                             AutomationProperties.Name="Audio-Level-Anzeige"/>
                     </StackPanel>
 
                     <ui:Button Margin="24,0,0,0" VerticalAlignment="Center"
@@ -176,20 +184,28 @@
                                                             <RowDefinition Height="Auto"/>
                                                         </Grid.RowDefinitions>
 
-                                                        <ui:SymbolIcon Grid.Column="0" Grid.Row="0"
-                                                                       VerticalAlignment="Center" Margin="0,0,12,0"
-                                                                       FontSize="20"
-                                                                       Symbol="{Binding Quality.Level, Converter={StaticResource QualityIcon}}"
-                                                                       Foreground="{Binding Quality.Level, Converter={StaticResource QualityBrush}}"
-                                                                       AutomationProperties.Name="{Binding Quality.Level, Converter={StaticResource QualityLabel}}"/>
+                                                        <StackPanel Grid.Column="0" Grid.Row="0"
+                                                                    Orientation="Horizontal"
+                                                                    VerticalAlignment="Center" Margin="0,0,12,0">
+                                                            <ui:SymbolIcon FontSize="18"
+                                                                           Symbol="{Binding Quality.Level, Converter={StaticResource QualityIcon}}"
+                                                                           Foreground="{Binding Quality.Level, Converter={StaticResource QualityBrush}}"
+                                                                           AutomationProperties.Name="{Binding Quality.Level, Converter={StaticResource QualityLabel}}"/>
+                                                            <ctrl:DotLevelMeter Quality="{Binding Quality.Level}"
+                                                                                Margin="10,0,0,0" VerticalAlignment="Center"
+                                                                                AutomationProperties.Name="{Binding Quality.Level, Converter={StaticResource QualityLabel}}"/>
+                                                        </StackPanel>
 
                                                         <StackPanel Grid.Column="1" Grid.Row="0" VerticalAlignment="Center">
                                                             <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold"/>
-                                                            <TextBlock Opacity="0.6" FontSize="11">
-                                                                <Run Text="{Binding RawHostname, Mode=OneWay}"/> •
-                                                                <Run Text="{Binding Quality.Level, Converter={StaticResource QualityLabel}, Mode=OneWay}"/> •
-                                                                <Run Text="{Binding Quality.RoundTripMs, StringFormat={}{0} ms RTT, Mode=OneWay}"/>
-                                                            </TextBlock>
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <TextBlock Opacity="0.6" FontSize="11">
+                                                                    <Run Text="{Binding RawHostname, Mode=OneWay}"/> •
+                                                                    <Run Text="{Binding Quality.RoundTripMs, StringFormat={}{0} ms RTT, Mode=OneWay}"/>
+                                                                </TextBlock>
+                                                                <ctrl:VuMeterControl Margin="12,0,0,0" Width="80" Height="10"
+                                                                                     Level="{Binding DataContext.AudioLevel, RelativeSource={RelativeSource AncestorType=ItemsControl, AncestorLevel=3}, FallbackValue=0}"/>
+                                                            </StackPanel>
                                                         </StackPanel>
 
                                                         <StackPanel Grid.Column="2" Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center">
