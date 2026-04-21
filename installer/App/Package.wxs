@@ -38,7 +38,9 @@
                   Target="[INSTALLFOLDER]LiveStreamSound.exe"
                   WorkingDirectory="INSTALLFOLDER" />
         <RemoveFolder Id="RemoveShortcutFolder" On="uninstall" />
-        <RegistryValue Root="HKLM" Key="Software\LiveStreamSound" Name="installed"
+        <!-- HKCU is required here: the shortcut lives in a per-user location, and
+             WiX ICE38/43/57 enforce that the component's KeyPath be per-user too. -->
+        <RegistryValue Root="HKCU" Key="Software\LiveStreamSound" Name="installed"
                        Type="integer" Value="1" KeyPath="yes" />
       </Component>
     </ComponentGroup>
