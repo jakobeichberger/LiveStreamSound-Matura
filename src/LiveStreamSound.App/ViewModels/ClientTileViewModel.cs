@@ -7,9 +7,9 @@ using LiveStreamSound.Shared.Diagnostics;
 using LiveStreamSound.Shared.Protocol;
 using LiveStreamSound.Shared.Session;
 
-namespace LiveStreamSound.Host.ViewModels;
+namespace LiveStreamSound.App.ViewModels;
 
-public partial class ClientViewModel : ObservableObject
+public partial class ClientTileViewModel : ObservableObject
 {
     private readonly ConnectedClient _model;
     private readonly ControlServer _control;
@@ -31,7 +31,7 @@ public partial class ClientViewModel : ObservableObject
     [ObservableProperty] private string _primaryIssueBody = "";
     [ObservableProperty] private bool _hasIssues;
 
-    public ClientViewModel(ConnectedClient model, ControlServer control, SessionManager sessions)
+    public ClientTileViewModel(ConnectedClient model, ControlServer control, SessionManager sessions)
     {
         _model = model;
         _control = control;
@@ -46,34 +46,21 @@ public partial class ClientViewModel : ObservableObject
         _currentDeviceId = model.CurrentOutputDeviceId;
     }
 
-    partial void OnVolumeChanged(float value)
-    {
+    partial void OnVolumeChanged(float value) =>
         _ = _control.SendAsync(_model, new SetVolume(Math.Clamp(value, 0f, 1f)));
-    }
 
-    partial void OnIsMutedChanged(bool value)
-    {
+    partial void OnIsMutedChanged(bool value) =>
         _ = _control.SendAsync(_model, new SetMute(value));
-    }
 
     [RelayCommand]
     private void Kick()
     {
-        var result = MessageBox.Show(
-            "Client trennen?",
-            "Bestätigen",
-            MessageBoxButton.OKCancel);
+        var result = MessageBox.Show("Client trennen?", "Bestätigen", MessageBoxButton.OKCancel);
         if (result == MessageBoxResult.OK)
         {
             _ = _control.SendAsync(_model, new Kick("Host closed connection"));
             _sessions.UnregisterClient(_model.ClientId);
         }
-    }
-
-    [RelayCommand]
-    private void RequestDeviceList()
-    {
-        _ = _control.SendAsync(_model, new ListOutputDevicesRequest());
     }
 
     [RelayCommand]

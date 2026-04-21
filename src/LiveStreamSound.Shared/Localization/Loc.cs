@@ -162,6 +162,24 @@ public sealed class Loc : INotifyPropertyChanged
         ["A11y.VolumeSlider"] = new("Lautstärke in Prozent", "Volume in percent"),
         ["A11y.SessionCode"] = new("Sechsstelliger Sitzungscode", "Six-digit session code"),
 
+        // Role selection (start screen)
+        ["App.Welcome"] = new("Willkommen", "Welcome"),
+        ["App.ChooseRole"] = new("Was möchtest du tun?", "What would you like to do?"),
+        ["App.Role.SendTitle"] = new("Ton senden", "Send audio"),
+        ["App.Role.SendSubtitle"] = new(
+            "Dein Laptop ist der Host. Andere Geräte hören den Ton, den du hier abspielst (z.B. in VLC).",
+            "Your laptop is the host. Other devices play the audio you play here (e.g. in VLC)."),
+        ["App.Role.ReceiveTitle"] = new("Ton empfangen", "Receive audio"),
+        ["App.Role.ReceiveSubtitle"] = new(
+            "Dein Laptop empfängt den Ton von einem anderen Laptop und gibt ihn hier aus.",
+            "Your laptop receives audio from another laptop and plays it here."),
+        ["App.SwitchRole"] = new("Rolle wechseln…", "Change role…"),
+        ["App.SwitchRoleConfirmTitle"] = new("Rolle wechseln?", "Change role?"),
+        ["App.SwitchRoleConfirmBody"] = new(
+            "Die aktive Sitzung wird dabei getrennt.",
+            "Your active session will be disconnected."),
+        ["App.Continue"] = new("Fortfahren", "Continue"),
+
         // Client
         ["Client.DiscoveredHosts"] = new("Gefundene Hosts", "Discovered hosts"),
         ["Client.ManualEntry"] = new("Manuell eingeben", "Manual entry"),

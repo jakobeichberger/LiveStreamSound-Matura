@@ -1,9 +1,9 @@
-<ui:FluentWindow x:Class="LiveStreamSound.Host.Views.MainWindow"
+<ui:FluentWindow x:Class="LiveStreamSound.App.Views.HostDashboardWindow"
                  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                  xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-                 xmlns:vm="clr-namespace:LiveStreamSound.Host.ViewModels"
-                 xmlns:conv="clr-namespace:LiveStreamSound.Host.Converters"
+                 xmlns:vm="clr-namespace:LiveStreamSound.App.ViewModels"
+                 xmlns:conv="clr-namespace:LiveStreamSound.App.Converters"
                  xmlns:loc="clr-namespace:LiveStreamSound.Shared.Localization;assembly=LiveStreamSound.Shared"
                  Title="LiveStreamSound — Host"
                  Width="1100" Height="720"
@@ -11,36 +11,39 @@
                  WindowStartupLocation="CenterScreen"
                  ExtendsContentIntoTitleBar="True"
                  WindowBackdropType="Mica">
+    <ui:FluentWindow.DataContext>
+        <vm:HostDashboardViewModel/>
+    </ui:FluentWindow.DataContext>
+
     <ui:FluentWindow.Resources>
-        <conv:QualityLevelToBrushConverter x:Key="QualityBrush" />
-        <conv:QualityLevelToIconConverter x:Key="QualityIcon" />
-        <conv:QualityLevelToLocalizedStringConverter x:Key="QualityLabel" />
-        <conv:LogLevelToBrushConverter x:Key="LogBrush" />
-        <conv:BoolToVisibilityConverter x:Key="BoolToVis" />
-        <conv:BoolToVisibilityConverter x:Key="BoolToVisInv" Inverted="True" />
-        <conv:BoolInverterConverter x:Key="BoolInv" />
-        <conv:BoolToBrushConverter x:Key="AudioFlowingBrush" />
-        <conv:IntToVisibilityConverter x:Key="CountEmptyToVis" VisibleWhenZero="True" />
-        <conv:FloatToPercentConverter x:Key="FloatPct" />
+        <conv:QualityLevelToBrushConverter x:Key="QualityBrush"/>
+        <conv:QualityLevelToIconConverter x:Key="QualityIcon"/>
+        <conv:QualityLevelToLocalizedStringConverter x:Key="QualityLabel"/>
+        <conv:LogLevelToBrushConverter x:Key="LogBrush"/>
+        <conv:BoolToVisibilityConverter x:Key="BoolToVis"/>
+        <conv:BoolToVisibilityConverter x:Key="BoolToVisInv" Inverted="True"/>
+        <conv:BoolInverterConverter x:Key="BoolInv"/>
+        <conv:BoolToBrushConverter x:Key="AudioFlowingBrush"/>
+        <conv:IntToVisibilityConverter x:Key="CountEmptyToVis" VisibleWhenZero="True"/>
+        <conv:FloatToPercentConverter x:Key="FloatPct"/>
     </ui:FluentWindow.Resources>
 
     <ui:FluentWindow.InputBindings>
-        <KeyBinding Key="Escape" Command="{Binding CloseSidePanelsCommand}" />
+        <KeyBinding Key="Escape" Command="{Binding CloseSidePanelsCommand}"/>
     </ui:FluentWindow.InputBindings>
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <ui:TitleBar Grid.Row="0"
-                     Title="{Binding [AppName.Host], Source={x:Static loc:Loc.Instance}, Mode=OneWay}">
+        <ui:TitleBar Grid.Row="0" Title="{Binding [AppName.Host], Source={x:Static loc:Loc.Instance}, Mode=OneWay}">
             <ui:TitleBar.Header>
                 <StackPanel Orientation="Horizontal" Margin="8,0,0,0" VerticalAlignment="Center">
-                    <ui:SymbolIcon Symbol="Speaker232" Margin="0,0,8,0" />
+                    <ui:SymbolIcon Symbol="Speaker232" Margin="0,0,8,0"/>
                     <TextBlock Text="LiveStreamSound" FontWeight="SemiBold" VerticalAlignment="Center"/>
                 </StackPanel>
             </ui:TitleBar.Header>
@@ -59,11 +62,11 @@
                     <ui:Button Appearance="Primary" Icon="{ui:SymbolIcon PlayCircle24}"
                                Content="{Binding [Host.StartSession], Source={x:Static loc:Loc.Instance}}"
                                Command="{Binding StartSessionCommand}"
-                               Visibility="{Binding IsSessionActive, Converter={StaticResource BoolToVisInv}}" />
+                               Visibility="{Binding IsSessionActive, Converter={StaticResource BoolToVisInv}}"/>
                     <ui:Button Appearance="Danger" Icon="{ui:SymbolIcon RecordStop24}"
                                Content="{Binding [Host.StopSession], Source={x:Static loc:Loc.Instance}}"
                                Command="{Binding StopSessionCommand}"
-                               Visibility="{Binding IsSessionActive, Converter={StaticResource BoolToVis}}" />
+                               Visibility="{Binding IsSessionActive, Converter={StaticResource BoolToVis}}"/>
 
                     <StackPanel Margin="24,0,0,0" VerticalAlignment="Center"
                                 Visibility="{Binding IsSessionActive, Converter={StaticResource BoolToVis}}">
@@ -78,19 +81,10 @@
                         <TextBlock Text="{Binding [Host.HostIp], Source={x:Static loc:Loc.Instance}}"
                                    Opacity="0.7" FontSize="11"/>
                         <TextBlock FontSize="16" FontFamily="Consolas">
-                            <Run Text="{Binding HostIp, Mode=OneWay}" />:<Run Text="{Binding ControlPort, Mode=OneWay}" />
+                            <Run Text="{Binding HostIp, Mode=OneWay}"/>:<Run Text="{Binding ControlPort, Mode=OneWay}"/>
                         </TextBlock>
                     </StackPanel>
                 </StackPanel>
-
-                <!-- QR -->
-                <Border Grid.Column="1" HorizontalAlignment="Right" Margin="0,0,24,0"
-                        Visibility="{Binding IsSessionActive, Converter={StaticResource BoolToVis}}"
-                        CornerRadius="8" Background="White" Padding="6">
-                    <Image Source="{Binding QrCode}" Width="96" Height="96"
-                           AutomationProperties.Name="{Binding [A11y.QrCode], Source={x:Static loc:Loc.Instance}}"
-                           AutomationProperties.HelpText="{Binding ConnectionUri}"/>
-                </Border>
 
                 <!-- Global actions -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
@@ -103,13 +97,15 @@
                     <ui:Button Icon="{ui:SymbolIcon DarkTheme24}"
                                ToolTip="{Binding [A11y.ThemeToggle], Source={x:Static loc:Loc.Instance}}"
                                AutomationProperties.Name="{Binding [A11y.ThemeToggle], Source={x:Static loc:Loc.Instance}}"
-                               Command="{Binding ToggleThemeCommand}"
-                               Margin="0,0,8,0"/>
+                               Command="{Binding ToggleThemeCommand}" Margin="0,0,8,0"/>
+                    <ui:Button Icon="{ui:SymbolIcon ArrowSwap24}"
+                               ToolTip="{Binding [App.SwitchRole], Source={x:Static loc:Loc.Instance}}"
+                               AutomationProperties.Name="{Binding [App.SwitchRole], Source={x:Static loc:Loc.Instance}}"
+                               Command="{Binding SwitchRoleCommand}" Margin="0,0,8,0"/>
                     <ui:Button Icon="{ui:SymbolIcon QuestionCircle24}"
                                ToolTip="{Binding [A11y.HelpButton], Source={x:Static loc:Loc.Instance}}"
                                AutomationProperties.Name="{Binding [A11y.HelpButton], Source={x:Static loc:Loc.Instance}}"
-                               Command="{Binding ToggleHelpCommand}"
-                               Margin="0,0,8,0"/>
+                               Command="{Binding ToggleHelpCommand}" Margin="0,0,8,0"/>
                     <ui:Button Icon="{ui:SymbolIcon DocumentError24}"
                                ToolTip="{Binding [A11y.LogButton], Source={x:Static loc:Loc.Instance}}"
                                AutomationProperties.Name="{Binding [A11y.LogButton], Source={x:Static loc:Loc.Instance}}"
@@ -118,30 +114,28 @@
             </Grid>
         </Border>
 
-        <!-- Main: client groups + side panels -->
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Client list -->
             <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" Padding="16">
                 <StackPanel>
                     <ui:InfoBar IsClosable="False"
                                 Title="{Binding [Host.Status.Idle], Source={x:Static loc:Loc.Instance}}"
                                 Severity="Informational"
-                                IsOpen="{Binding IsSessionActive, Converter={StaticResource BoolInv}}" />
+                                IsOpen="{Binding IsSessionActive, Converter={StaticResource BoolInv}}"/>
                     <ui:InfoBar IsClosable="False"
                                 Title="{Binding [Host.Status.Running], Source={x:Static loc:Loc.Instance}}"
                                 Severity="Success"
-                                IsOpen="{Binding IsSessionActive}" />
+                                IsOpen="{Binding IsSessionActive}"/>
                     <ui:InfoBar IsClosable="True"
                                 Title="{Binding StartupErrorTitle}"
                                 Message="{Binding StartupErrorBody}"
                                 Severity="Error"
                                 Margin="0,8,0,0"
-                                IsOpen="{Binding HasStartupError, Mode=TwoWay}" />
+                                IsOpen="{Binding HasStartupError, Mode=TwoWay}"/>
 
                     <TextBlock Margin="0,16,0,0" Opacity="0.6"
                                Visibility="{Binding ClientGroups.Count, Converter={StaticResource CountEmptyToVis}}"
@@ -161,7 +155,7 @@
                                     </Expander.Header>
                                     <ItemsControl ItemsSource="{Binding Clients}">
                                         <ItemsControl.ItemTemplate>
-                                            <DataTemplate DataType="{x:Type vm:ClientViewModel}">
+                                            <DataTemplate DataType="{x:Type vm:ClientTileViewModel}">
                                                 <ui:Card Margin="0,4">
                                                     <Grid>
                                                         <Grid.ColumnDefinitions>
@@ -175,7 +169,6 @@
                                                             <RowDefinition Height="Auto"/>
                                                         </Grid.RowDefinitions>
 
-                                                        <!-- Quality indicator: shape + color + SR announcement -->
                                                         <ui:SymbolIcon Grid.Column="0" Grid.Row="0"
                                                                        VerticalAlignment="Center" Margin="0,0,12,0"
                                                                        FontSize="20"
@@ -183,17 +176,15 @@
                                                                        Foreground="{Binding Quality.Level, Converter={StaticResource QualityBrush}}"
                                                                        AutomationProperties.Name="{Binding Quality.Level, Converter={StaticResource QualityLabel}}"/>
 
-                                                        <!-- Name + room -->
                                                         <StackPanel Grid.Column="1" Grid.Row="0" VerticalAlignment="Center">
                                                             <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold"/>
                                                             <TextBlock Opacity="0.6" FontSize="11">
-                                                                <Run Text="{Binding RawHostname, Mode=OneWay}" /> •
-                                                                <Run Text="{Binding Quality.Level, Converter={StaticResource QualityLabel}, Mode=OneWay}" /> •
-                                                                <Run Text="{Binding Quality.RoundTripMs, StringFormat={}{0} ms RTT, Mode=OneWay}" />
+                                                                <Run Text="{Binding RawHostname, Mode=OneWay}"/> •
+                                                                <Run Text="{Binding Quality.Level, Converter={StaticResource QualityLabel}, Mode=OneWay}"/> •
+                                                                <Run Text="{Binding Quality.RoundTripMs, StringFormat={}{0} ms RTT, Mode=OneWay}"/>
                                                             </TextBlock>
                                                         </StackPanel>
 
-                                                        <!-- Actions -->
                                                         <StackPanel Grid.Column="2" Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center">
                                                             <ui:ToggleSwitch IsChecked="{Binding IsMuted}"
                                                                              OnContent="{Binding [Host.MuteOn], Source={x:Static loc:Loc.Instance}}"
@@ -206,7 +197,6 @@
                                                                        Command="{Binding KickCommand}"/>
                                                         </StackPanel>
 
-                                                        <!-- Volume + device row -->
                                                         <Grid Grid.Column="1" Grid.Row="1" Margin="0,12,0,0">
                                                             <Grid.ColumnDefinitions>
                                                                 <ColumnDefinition Width="Auto"/>
@@ -230,7 +220,6 @@
                                                                       MinWidth="200" Margin="16,0,0,0"/>
                                                         </Grid>
 
-                                                        <!-- Issue banner -->
                                                         <Border Grid.ColumnSpan="3" Grid.Row="2" Margin="0,8,0,0"
                                                                 CornerRadius="6" Padding="10,8"
                                                                 Background="{DynamicResource SystemFillColorCautionBackgroundBrush}"
@@ -252,7 +241,6 @@
                 </StackPanel>
             </ScrollViewer>
 
-            <!-- Help panel (right side, collapsible) -->
             <Border Grid.Column="1" Width="360"
                     BorderThickness="1,0,0,0"
                     BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
@@ -277,7 +265,6 @@
                 </ScrollViewer>
             </Border>
 
-            <!-- Log panel -->
             <Border Grid.Column="1" Width="480"
                     BorderThickness="1,0,0,0"
                     BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
@@ -290,7 +277,6 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
-
                     <Grid Grid.Row="0">
                         <TextBlock Text="{Binding [Log], Source={x:Static loc:Loc.Instance}}"
                                    FontSize="20" FontWeight="SemiBold"/>
@@ -331,13 +317,12 @@
             </Border>
         </Grid>
 
-        <!-- Status bar -->
         <Border Grid.Row="3" Padding="12,6"
                 BorderThickness="0,1,0,0"
                 BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}">
             <StackPanel Orientation="Horizontal">
                 <Ellipse Width="10" Height="10" Margin="0,0,8,0"
-                         Fill="{Binding AudioFlowing, Converter={StaticResource AudioFlowingBrush}}" />
+                         Fill="{Binding AudioFlowing, Converter={StaticResource AudioFlowingBrush}}"/>
                 <TextBlock Text="{Binding [Host.CapturingAudio], Source={x:Static loc:Loc.Instance}}"
                            Visibility="{Binding AudioFlowing, Converter={StaticResource BoolToVis}}"/>
                 <TextBlock Text="{Binding [Host.NoAudio], Source={x:Static loc:Loc.Instance}}"

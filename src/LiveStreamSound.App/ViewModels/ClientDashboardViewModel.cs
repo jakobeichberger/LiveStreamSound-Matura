@@ -1,17 +1,19 @@
 using System.Collections.ObjectModel;
 using System.Net;
+using System.Windows;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using LiveStreamSound.App.Services;
 using LiveStreamSound.Client.Services;
 using LiveStreamSound.Shared.Diagnostics;
 using LiveStreamSound.Shared.Discovery;
 using LiveStreamSound.Shared.Localization;
 using Wpf.Ui.Appearance;
 
-namespace LiveStreamSound.Client.ViewModels;
+namespace LiveStreamSound.App.ViewModels;
 
-public partial class MainViewModel : ObservableObject
+public partial class ClientDashboardViewModel : ObservableObject
 {
     private readonly ClientOrchestrator _orchestrator;
     private readonly Dispatcher _dispatcher;
@@ -51,11 +53,13 @@ public partial class MainViewModel : ObservableObject
     public ObservableCollection<LogEntry> LogEntries { get; } = new();
     public Loc Localization => Loc.Instance;
 
-    public MainViewModel(ClientOrchestrator orchestrator)
+    public ClientDashboardViewModel()
     {
-        _orchestrator = orchestrator;
+        _orchestrator = AppShell.Current.Client
+            ?? throw new InvalidOperationException("ClientDashboardViewModel created without active ClientOrchestrator");
         _dispatcher = Dispatcher.CurrentDispatcher;
         _displayName = _orchestrator.SuggestedDisplayName;
+        IsDarkTheme = ApplicationThemeManager.GetAppTheme() == ApplicationTheme.Dark;
 
         RefreshOutputDevices();
 
@@ -113,24 +117,20 @@ public partial class MainViewModel : ObservableObject
         });
     }
 
-    private void HandleLogEntry(LogEntry e)
-    {
+    private void HandleLogEntry(LogEntry e) =>
         _dispatcher.BeginInvoke(() =>
         {
             LogEntries.Insert(0, e);
             if (LogEntries.Count > 500) LogEntries.RemoveAt(LogEntries.Count - 1);
         });
-    }
 
-    private void HandleDiscoveryUpdate(IReadOnlyList<DiscoveredHost> hosts)
-    {
+    private void HandleDiscoveryUpdate(IReadOnlyList<DiscoveredHost> hosts) =>
         _dispatcher.BeginInvoke(() =>
         {
             DiscoveredHosts.Clear();
             foreach (var h in hosts)
                 DiscoveredHosts.Add(new DiscoveredHostViewModel(h));
         });
-    }
 
     [RelayCommand]
     private void SelectDiscoveredHost(DiscoveredHostViewModel vm)
@@ -144,7 +144,8 @@ public partial class MainViewModel : ObservableObject
     {
         ConnectionError = "";
         ConnectionErrorBody = "";
-        if (!IPAddress.TryParse(ManualHost, out var ip))
+        IPAddress? ip = null;
+        if (!IPAddress.TryParse(ManualHost, out ip))
         {
             try
             {
@@ -156,9 +157,7 @@ public partial class MainViewModel : ObservableObject
         }
         if (ip is null)
         {
-            ConnectionError = Loc.Instance.Get("Client.Error.InvalidHost") is { Length: > 0 } v && v != "Client.Error.InvalidHost"
-                ? v
-                : "Ungültige Host-IP / Invalid host IP";
+            ConnectionError = "Ungültige Host-IP / Invalid host IP";
             return;
         }
         if (string.IsNullOrWhiteSpace(SessionCode))
@@ -191,11 +190,8 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
-    private async Task Disconnect()
-    {
+    [RelayCommand] private async Task Disconnect() =>
         await _orchestrator.Control.DisposeAsync();
-    }
 
     [RelayCommand]
     private void SelectDevice(string deviceId)
@@ -205,7 +201,8 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand] private void ToggleLanguage() => Loc.Instance.Toggle();
-    [RelayCommand] private void ToggleTheme()
+    [RelayCommand]
+    private void ToggleTheme()
     {
         IsDarkTheme = !IsDarkTheme;
         ApplicationThemeManager.Apply(IsDarkTheme ? ApplicationTheme.Dark : ApplicationTheme.Light);
@@ -227,4 +224,19 @@ public partial class MainViewModel : ObservableObject
         catch { }
     }
     [RelayCommand] private void ClearLogView() => LogEntries.Clear();
+
+    [RelayCommand]
+    private void SwitchRole()
+    {
+        if (AppShell.Current.HasActiveSession)
+        {
+            var result = MessageBox.Show(
+                Loc.Instance.Get("App.SwitchRoleConfirmBody"),
+                Loc.Instance.Get("App.SwitchRoleConfirmTitle"),
+                MessageBoxButton.OKCancel,
+                MessageBoxImage.Warning);
+            if (result != MessageBoxResult.OK) return;
+        }
+        AppShell.Current.ShowRoleSelection();
+    }
 }
