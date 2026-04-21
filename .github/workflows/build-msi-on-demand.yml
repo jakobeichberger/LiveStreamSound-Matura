@@ -37,6 +37,9 @@ jobs:
           dotnet build src/LiveStreamSound.Host/LiveStreamSound.Host.csproj -c Release --no-restore
           dotnet build src/LiveStreamSound.Client/LiveStreamSound.Client.csproj -c Release --no-restore
 
+      - name: Run unit tests
+        run: dotnet test tests/LiveStreamSound.Shared.Tests/LiveStreamSound.Shared.Tests.csproj -c Release --no-restore --verbosity normal
+
       - name: Publish App (self-contained, bundled .NET runtime)
         run: >
           dotnet publish src/LiveStreamSound.App/LiveStreamSound.App.csproj

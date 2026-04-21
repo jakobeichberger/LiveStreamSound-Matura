@@ -69,7 +69,8 @@
                                Command="{Binding StopSessionCommand}"
                                Visibility="{Binding IsSessionActive, Converter={StaticResource BoolToVis}}"/>
 
-                    <StackPanel Margin="24,0,0,0" VerticalAlignment="Center"
+                    <StackPanel x:Name="HostHeroAnchor" Tag="host-anchor"
+                                Margin="24,0,0,0" VerticalAlignment="Center"
                                 Visibility="{Binding IsSessionActive, Converter={StaticResource BoolToVis}}">
                         <TextBlock Text="{Binding [Host.SessionCode], Source={x:Static loc:Loc.Instance}}"
                                    Opacity="0.7" FontSize="11"/>
@@ -129,6 +130,14 @@
             </Grid>
         </Border>
 
+        <!-- Connection flow overlay (particles between host hero and each client tile) -->
+        <ctrl:ConnectionFlowCanvas Grid.Row="1" Grid.RowSpan="2"
+                                   AudioLevel="{Binding AudioLevel}"
+                                   HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                                   IsHitTestVisible="False"
+                                   Panel.ZIndex="50"
+                                   ClipToBounds="True"/>
+
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
@@ -171,7 +180,7 @@
                                     <ItemsControl ItemsSource="{Binding Clients}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate DataType="{x:Type vm:ClientTileViewModel}">
-                                                <ui:Card Margin="0,4">
+                                                <ui:Card Margin="0,4" Tag="client-anchor">
                                                     <Grid>
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="Auto"/>

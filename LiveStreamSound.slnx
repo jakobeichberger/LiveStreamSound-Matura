@@ -9,4 +9,7 @@
     <Project Path="src/LiveStreamSound.Host/LiveStreamSound.Host.csproj" />
     <Project Path="src/LiveStreamSound.Shared/LiveStreamSound.Shared.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/LiveStreamSound.Shared.Tests/LiveStreamSound.Shared.Tests.csproj" />
+  </Folder>
 </Solution>
