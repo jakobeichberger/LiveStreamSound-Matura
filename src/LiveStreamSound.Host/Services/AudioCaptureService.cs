@@ -28,6 +28,10 @@ public sealed class AudioCaptureService : IDisposable
         {
             if (_isRunning) return;
 
+            // Dispose the previous capture before creating a new one —
+            // otherwise a Stop/Start cycle (role switch, session restart)
+            // leaks a WasapiLoopbackCapture COM handle each time.
+            _capture?.Dispose();
             _capture = new WasapiLoopbackCapture();
             _buffer = new BufferedWaveProvider(_capture.WaveFormat)
             {

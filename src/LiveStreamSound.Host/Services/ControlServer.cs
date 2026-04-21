@@ -237,5 +237,12 @@ public sealed class ControlServer : IAsyncDisposable
         {
             try { await _acceptLoopTask.ConfigureAwait(false); } catch { }
         }
+        // Null out so the instance can be restarted via Start() again
+        // (otherwise Start throws "Already started" after a stopped session).
+        _cts?.Dispose();
+        _cts = null;
+        _listener = null;
+        _acceptLoopTask = null;
+        Port = 0;
     }
 }
