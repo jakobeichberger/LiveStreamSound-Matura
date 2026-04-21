@@ -84,6 +84,13 @@
                             <Run Text="{Binding HostIp, Mode=OneWay}"/>:<Run Text="{Binding ControlPort, Mode=OneWay}"/>
                         </TextBlock>
                     </StackPanel>
+
+                    <ui:Button Margin="24,0,0,0" VerticalAlignment="Center"
+                               Icon="{ui:SymbolIcon PersonAdd24}"
+                               Appearance="Secondary"
+                               Content="{Binding [Invite.OpenInviteDialog], Source={x:Static loc:Loc.Instance}}"
+                               Command="{Binding OpenInviteDialogCommand}"
+                               Visibility="{Binding IsSessionActive, Converter={StaticResource BoolToVis}}"/>
                 </StackPanel>
 
                 <!-- Global actions -->

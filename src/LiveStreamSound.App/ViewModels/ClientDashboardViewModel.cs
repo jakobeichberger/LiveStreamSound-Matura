@@ -69,9 +69,41 @@ public partial class ClientDashboardViewModel : ObservableObject
             _dispatcher.BeginInvoke(() => ConnectionError = err);
         _orchestrator.Log.EntryAdded += HandleLogEntry;
         _orchestrator.Discovery.HostsChanged += HandleDiscoveryUpdate;
+        _orchestrator.IdleListener.OnInvitation = HandleIncomingInvitation;
 
         foreach (var h in _orchestrator.Discovery.CurrentHosts)
             DiscoveredHosts.Add(new DiscoveredHostViewModel(h));
+    }
+
+    private Task<bool> HandleIncomingInvitation(LiveStreamSound.Shared.Protocol.Invitation inv)
+    {
+        var tcs = new TaskCompletionSource<bool>();
+        _dispatcher.BeginInvoke(() =>
+        {
+            try
+            {
+                var dlg = new Views.IncomingInviteDialog(inv)
+                {
+                    Owner = System.Windows.Application.Current.MainWindow
+                };
+                var accepted = dlg.ShowDialog() == true;
+                tcs.SetResult(accepted);
+
+                if (accepted && IPAddress.TryParse(inv.HostAddress, out var ip))
+                {
+                    ManualHost = inv.HostAddress;
+                    ManualPort = inv.HostControlPort;
+                    SessionCode = inv.SessionCode;
+                    _ = _orchestrator.ConnectAsync(ip, inv.HostControlPort, inv.SessionCode, DisplayName);
+                }
+            }
+            catch (Exception ex)
+            {
+                _orchestrator.Log.Warn("UI", "Incoming invite dialog failed", ex);
+                tcs.TrySetResult(false);
+            }
+        });
+        return tcs.Task;
     }
 
     public void RefreshOutputDevices()

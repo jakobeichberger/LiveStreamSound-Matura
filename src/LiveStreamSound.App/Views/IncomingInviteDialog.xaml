@@ -1,0 +1,41 @@
+<ui:FluentWindow x:Class="LiveStreamSound.App.Views.IncomingInviteDialog"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 xmlns:loc="clr-namespace:LiveStreamSound.Shared.Localization;assembly=LiveStreamSound.Shared"
+                 Width="440" Height="260"
+                 WindowStartupLocation="CenterOwner"
+                 ResizeMode="NoResize"
+                 ShowInTaskbar="False"
+                 ExtendsContentIntoTitleBar="True"
+                 WindowBackdropType="Mica">
+    <Grid Margin="0,24,0,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" HorizontalAlignment="Center" Margin="24,12,24,0">
+            <TextBlock Text="{Binding [Incoming.Title], Source={x:Static loc:Loc.Instance}}"
+                       FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" Margin="24,16,24,8" VerticalAlignment="Center">
+            <TextBlock Text="{Binding BodyText}" TextWrapping="Wrap" TextAlignment="Center"
+                       Opacity="0.85" FontSize="14"/>
+            <TextBlock Text="{Binding FormattedSessionCode}"
+                       FontSize="32" FontFamily="Consolas" FontWeight="Bold"
+                       HorizontalAlignment="Center" Margin="0,12,0,0"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right"
+                    Margin="0,0,24,24">
+            <ui:Button Content="{Binding [Incoming.Reject], Source={x:Static loc:Loc.Instance}}"
+                       Click="OnReject" Margin="0,0,8,0" Appearance="Secondary"/>
+            <ui:Button Content="{Binding [Incoming.Accept], Source={x:Static loc:Loc.Instance}}"
+                       Click="OnAccept" Appearance="Primary"
+                       Icon="{ui:SymbolIcon CheckmarkCircle24}"/>
+        </StackPanel>
+    </Grid>
+</ui:FluentWindow>

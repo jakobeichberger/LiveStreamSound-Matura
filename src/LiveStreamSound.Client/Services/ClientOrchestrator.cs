@@ -20,6 +20,7 @@ public sealed class ClientOrchestrator : IAsyncDisposable
     public AudioStreamClient AudioIn { get; }
     public AudioPlaybackService Playback { get; }
     public ClientDiagnosticsService Diagnostics { get; }
+    public IdleListenerService IdleListener { get; }
 
     public string SuggestedDisplayName { get; }
     public string HostName { get; } = Environment.MachineName;
@@ -39,6 +40,7 @@ public sealed class ClientOrchestrator : IAsyncDisposable
         AudioIn = new AudioStreamClient(Decoder, Buffer, Log);
         Playback = new AudioPlaybackService(Log);
         Diagnostics = new ClientDiagnosticsService(Control, AudioIn, Buffer, ClockSync);
+        IdleListener = new IdleListenerService(Log);
 
         SuggestedDisplayName = ClassroomLaptopName.FriendlyName(HostName);
 
@@ -46,10 +48,23 @@ public sealed class ClientOrchestrator : IAsyncDisposable
         Control.StateChanged += OnStateChanged;
     }
 
+    /// <summary>Start listening for host invitations on TCP 5002 and advertising via mDNS.</summary>
+    public void StartIdleListener() => IdleListener.Start(SuggestedDisplayName);
+
+    public Task StopIdleListenerAsync() => IdleListener.StopAsync();
+
     public async Task<bool> ConnectAsync(IPAddress host, int controlPort, string code, string displayName, CancellationToken ct = default)
     {
+        // While connected we shouldn't still accept invitations from other hosts.
+        await IdleListener.StopAsync().ConfigureAwait(false);
+
         var welcome = await Control.ConnectAsync(host, controlPort, code, displayName, ct);
-        if (welcome is null) return false;
+        if (welcome is null)
+        {
+            // Reconnect-to-idle so the user can still be invited.
+            IdleListener.Start(SuggestedDisplayName);
+            return false;
+        }
 
         try
         {
@@ -90,6 +105,8 @@ public sealed class ClientOrchestrator : IAsyncDisposable
             StopPumps();
             _ = AudioIn.Stop();
             Playback.Stop();
+            // Back to idle — accept future host invitations again.
+            IdleListener.Start(SuggestedDisplayName);
         }
     }
 
@@ -166,6 +183,7 @@ public sealed class ClientOrchestrator : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         StopPumps();
+        await IdleListener.DisposeAsync();
         await Control.DisposeAsync();
         await AudioIn.DisposeAsync();
         Playback.Dispose();

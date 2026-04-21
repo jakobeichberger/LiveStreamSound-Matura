@@ -23,6 +23,8 @@ public sealed class HostOrchestrator : IAsyncDisposable
     public MDnsAdvertiseService MDns { get; }
     public DiagnosticsService Diagnostics { get; }
     public AudioPipelineState Pipeline { get; }
+    public IdleClientDiscoveryService IdleClientDiscovery { get; }
+    public InviteClientService InviteClient { get; }
 
     public string? LocalIp { get; private set; }
 
@@ -37,6 +39,8 @@ public sealed class HostOrchestrator : IAsyncDisposable
         Encoder = new OpusEncoderService();
         MDns = new MDnsAdvertiseService(Log);
         Diagnostics = new DiagnosticsService(Sessions, Pipeline, Log);
+        IdleClientDiscovery = new IdleClientDiscoveryService(Log);
+        InviteClient = new InviteClientService(Log);
 
         Capture.FrameAvailable += OnPcmFrame;
         Capture.CaptureError += ex => Log.Error("Capture", "Recording error", ex);
@@ -146,6 +150,7 @@ public sealed class HostOrchestrator : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         await StopSessionAsync();
+        IdleClientDiscovery.Dispose();
         Capture.Dispose();
         Diagnostics.Dispose();
         Log.Dispose();
