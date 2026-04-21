@@ -38,7 +38,7 @@
                   Target="[INSTALLFOLDER]LiveStreamSound.exe"
                   WorkingDirectory="INSTALLFOLDER" />
         <RemoveFolder Id="RemoveShortcutFolder" On="uninstall" />
-        <RegistryValue Root="HKCU" Key="Software\LiveStreamSound" Name="installed"
+        <RegistryValue Root="HKLM" Key="Software\LiveStreamSound" Name="installed"
                        Type="integer" Value="1" KeyPath="yes" />
       </Component>
     </ComponentGroup>
@@ -51,7 +51,7 @@
     -->
     <ComponentGroup Id="AppFirewall" Directory="INSTALLFOLDER">
       <Component Id="AppFirewallRules" Guid="7E4D2F11-19B8-4F9F-9A0D-33B1C2F1B302" KeyPath="yes">
-        <RegistryValue Root="HKCU" Key="Software\LiveStreamSound" Name="firewall"
+        <RegistryValue Root="HKLM" Key="Software\LiveStreamSound" Name="firewall"
                        Type="integer" Value="1" />
         <fw:FirewallException Id="LSS_TCP_Control"
                               Name="LiveStreamSound (TCP Control)"
