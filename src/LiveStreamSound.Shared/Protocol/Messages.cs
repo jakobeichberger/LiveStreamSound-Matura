@@ -62,3 +62,11 @@ public record Invitation(
 public record InvitationResponse(
     bool Accepted,
     string? Reason) : ControlMessage;
+
+/// <summary>
+/// Sent from Client → Host after the client has bound its UDP audio listener.
+/// Lets the host fan-out audio to the client's actual ephemeral port rather than
+/// assuming a fixed port — critical for same-machine local testing where host
+/// and client would otherwise collide on UDP 5001.
+/// </summary>
+public record AudioClientReady(int ClientUdpPort) : ControlMessage;

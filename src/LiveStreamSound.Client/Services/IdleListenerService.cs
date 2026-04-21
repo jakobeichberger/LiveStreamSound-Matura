@@ -21,6 +21,7 @@ public sealed class IdleListenerService : IAsyncDisposable
     private readonly LogService _log;
     private TcpListener? _listener;
     private ServiceDiscovery? _sd;
+    private MulticastService? _mc;
     private CancellationTokenSource? _cts;
     private Task? _acceptLoop;
     private bool _running;
@@ -43,7 +44,9 @@ public sealed class IdleListenerService : IAsyncDisposable
             _listener = new TcpListener(IPAddress.Any, DiscoveryConstants.DefaultIdleClientPort);
             _listener.Start();
 
-            _sd = new ServiceDiscovery();
+            _mc = new MulticastService(nics => nics.Where(NetworkInterfaceFilter.IsRealLan).ToList());
+            _sd = new ServiceDiscovery(_mc);
+            _mc.Start();
             var profile = new ServiceProfile(
                 instanceName: Environment.MachineName,
                 serviceName: DiscoveryConstants.MDnsClientServiceType,
@@ -73,7 +76,9 @@ public sealed class IdleListenerService : IAsyncDisposable
         try { _listener?.Stop(); } catch { }
         try { _sd?.Unadvertise(); } catch { }
         try { _sd?.Dispose(); } catch { }
+        try { _mc?.Dispose(); } catch { }
         _sd = null;
+        _mc = null;
         _listener = null;
         if (_acceptLoop is not null)
         {
@@ -135,7 +140,11 @@ public sealed class IdleListenerService : IAsyncDisposable
                 var reason = accepted ? null : "declined";
                 try
                 {
-                    await MessageJson.WriteFrameAsync(stream, new InvitationResponse(accepted, reason), ct)
+                    // Deliberately CancellationToken.None: the host is waiting for
+                    // our response and racing the listener's lifecycle cancellation
+                    // (StopAsync fires the listener's ct once we start connecting)
+                    // would leave the host reading `null` and log a spurious warning.
+                    await MessageJson.WriteFrameAsync(stream, new InvitationResponse(accepted, reason), CancellationToken.None)
                         .ConfigureAwait(false);
                 }
                 catch { /* client may have closed socket */ }

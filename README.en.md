@@ -99,9 +99,21 @@ The MSI artifact installs cleanly on a freshly imaged Windows PC without a separ
 | Port | Proto | Purpose |
 |---|---|---|
 | 5000 | TCP | Host control channel (JSON messages) |
-| 5001 | UDP | Host audio stream (Opus, fan-out to every client) |
+| 5001 | UDP | Host audio source (fan-out to every client) |
+| **ephemeral** | UDP | **Client audio receive** (OS-assigned, reported to host via `AudioClientReady`) |
 | 5002 | TCP | Idle-client listener (receives invites from hosts) |
 | 5353 | UDP | mDNS (service discovery) |
+
+The client binds its UDP receive port to an ephemeral (OS-picked) port and tells the host after HELLO — so host and client can run **on the same machine** without clashing on 5001.
+
+## Local smoke-test (both roles on one machine)
+
+1. Launch one instance → pick **Send audio** → **Start session**.
+2. Launch a second instance of the same `.exe` → pick **Receive audio**.
+3. The host shows up in *Discovered hosts* on the client (on the real Wi-Fi IP, not the Hyper-V virtual adapter — virtual NICs are filtered).
+4. Type the code shown on the host → **Connect**.
+
+Or: use **Add client** on the host to invite the idle client — both paths end in the same HELLO flow.
 
 The MSI adds TCP 5000, UDP 5001, TCP 5002 to the Windows Firewall automatically (scope: LocalSubnet).
 

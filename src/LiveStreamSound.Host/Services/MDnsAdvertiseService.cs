@@ -7,6 +7,7 @@ public sealed class MDnsAdvertiseService : IDisposable
 {
     private readonly LogService _log;
     private ServiceDiscovery? _sd;
+    private MulticastService? _mc;
 
     public MDnsAdvertiseService(LogService log) { _log = log; }
 
@@ -22,8 +23,13 @@ public sealed class MDnsAdvertiseService : IDisposable
             profile.AddProperty(DiscoveryConstants.TxtVersionKey, DiscoveryConstants.ProtocolVersion.ToString());
             profile.AddProperty(DiscoveryConstants.TxtSessionNameKey, sessionName);
 
-            _sd = new ServiceDiscovery();
+            // Restrict mDNS advertising to real Wi-Fi / Ethernet adapters — skip
+            // Hyper-V, WSL, VMware etc. virtual adapters so clients never see a
+            // stale 172.x.x.x / 10.x.x.x virtual-switch IP for this session.
+            _mc = new MulticastService(nics => nics.Where(NetworkInterfaceFilter.IsRealLan).ToList());
+            _sd = new ServiceDiscovery(_mc);
             _sd.Advertise(profile);
+            _mc.Start();
             _log.Info("mDNS", $"Advertising '{instanceName}' on {controlPort} ({DiscoveryConstants.MDnsServiceType})");
         }
         catch (Exception ex)
@@ -36,6 +42,8 @@ public sealed class MDnsAdvertiseService : IDisposable
     {
         try { _sd?.Unadvertise(); } catch { }
         try { _sd?.Dispose(); } catch { }
+        try { _mc?.Dispose(); } catch { }
         _sd = null;
+        _mc = null;
     }
 }

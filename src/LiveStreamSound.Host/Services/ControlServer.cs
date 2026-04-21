@@ -152,6 +152,12 @@ public sealed class ControlServer : IAsyncDisposable
                 client.CurrentOutputDeviceId = resp.CurrentDeviceId;
                 break;
 
+            case AudioClientReady ready:
+                client.AudioEndpoint = new IPEndPoint(client.TcpEndpoint.Address, ready.ClientUdpPort);
+                _log.Info("ControlServer",
+                    $"{client.ClientId} ({client.ClientName}) audio endpoint set to {client.AudioEndpoint}");
+                break;
+
             default:
                 // Unknown / unexpected messages are ignored
                 break;
