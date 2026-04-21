@@ -180,6 +180,24 @@ public sealed class Loc : INotifyPropertyChanged
             "Your active session will be disconnected."),
         ["App.Continue"] = new("Fortfahren", "Continue"),
 
+        // Invite flow (Host → idle Client)
+        ["Invite.DialogTitle"] = new("Client einladen", "Invite client"),
+        ["Invite.IdleClients"] = new("Wartende Clients im Netzwerk", "Idle clients on the network"),
+        ["Invite.NoIdleClients"] = new("Aktuell kein wartender Client gefunden.", "No idle clients found right now."),
+        ["Invite.ManualTarget"] = new("Oder direkt per IP", "Or directly by IP"),
+        ["Invite.InvitationButton"] = new("Einladen", "Invite"),
+        ["Invite.Cancel"] = new("Abbrechen", "Cancel"),
+        ["Invite.Sending"] = new("Einladung wird gesendet…", "Sending invitation…"),
+        ["Invite.Error.Unreachable"] = new("Der Client ist nicht erreichbar. IP, Port und WLAN prüfen.", "The client is not reachable. Check IP, port and Wi-Fi."),
+        ["Invite.Error.Rejected"] = new("Der Client hat abgelehnt.", "The client declined the invitation."),
+        ["Invite.OpenInviteDialog"] = new("Client hinzufügen", "Add client"),
+
+        // Incoming invite (on the Client side)
+        ["Incoming.Title"] = new("📥 Einladung erhalten", "📥 You're invited"),
+        ["Incoming.Body"] = new("{0} (IP {1}) lädt dich in Session {2} ein.", "{0} (IP {1}) is inviting you to session {2}."),
+        ["Incoming.Accept"] = new("Annehmen", "Accept"),
+        ["Incoming.Reject"] = new("Ablehnen", "Decline"),
+
         // Client
         ["Client.DiscoveredHosts"] = new("Gefundene Hosts", "Discovered hosts"),
         ["Client.ManualEntry"] = new("Manuell eingeben", "Manual entry"),
