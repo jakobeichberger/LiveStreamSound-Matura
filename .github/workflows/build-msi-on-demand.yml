@@ -1,13 +1,9 @@
 name: Build MSI (on demand)
 
 on:
+  # Manual trigger only — the user prefers to approve every CI run
+  # rather than burning ~3 minutes of Actions time on every merge.
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'src/**'
-      - 'installer/**'
-      - '.github/workflows/build-msi-on-demand.yml'
 
 permissions:
   contents: read
