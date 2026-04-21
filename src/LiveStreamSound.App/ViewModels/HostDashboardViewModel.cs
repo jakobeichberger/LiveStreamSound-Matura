@@ -25,6 +25,7 @@ public partial class HostDashboardViewModel : ObservableObject
     [ObservableProperty] private string _hostIp = "?";
     [ObservableProperty] private int _controlPort = DiscoveryConstants.DefaultControlPort;
     [ObservableProperty] private bool _audioFlowing;
+    [ObservableProperty] private double _audioLevel;
     [ObservableProperty] private bool _isHelpOpen;
     [ObservableProperty] private bool _isLogOpen;
     [ObservableProperty] private bool _isDarkTheme = true;
@@ -54,8 +55,13 @@ public partial class HostDashboardViewModel : ObservableObject
         _orchestrator.Control.ClientStatusReceived += OnClientStatusHandler;
         _orchestrator.Log.EntryAdded += OnLogEntryHandler;
 
-        var timer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Normal,
-            (_, _) => AudioFlowing = _orchestrator.Pipeline.AudioFlowing,
+        // VU-meter tick runs at ~30 fps for smooth bar animation.
+        var timer = new DispatcherTimer(TimeSpan.FromMilliseconds(33), DispatcherPriority.Render,
+            (_, _) =>
+            {
+                AudioLevel = _orchestrator.Pipeline.CurrentLevel;
+                AudioFlowing = _orchestrator.Pipeline.AudioFlowing;
+            },
             _dispatcher);
         timer.Start();
     }
