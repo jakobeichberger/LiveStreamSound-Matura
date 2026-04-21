@@ -6,4 +6,10 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- EventLog is Windows-only at runtime but the package compiles on every TFM
+         — calls are gated by OperatingSystem.IsWindows() in EventLogSink. -->
+    <PackageReference Include="System.Diagnostics.EventLog" Version="9.0.0" />
+  </ItemGroup>
+
 </Project>

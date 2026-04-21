@@ -15,6 +15,7 @@ public sealed class ControlServer : IAsyncDisposable
 {
     private readonly SessionManager _sessions;
     private readonly LogService _log;
+    private readonly AuthAttemptTracker _auth = new();
     private TcpListener? _listener;
     private CancellationTokenSource? _cts;
     private Task? _acceptLoopTask;
@@ -105,6 +106,16 @@ public sealed class ControlServer : IAsyncDisposable
                 return;
             }
 
+            // Rate-limit auth attempts so the 6-digit session code can't be
+            // brute-forced from the LAN (1M combinations · 1000 req/s = ~17 min).
+            if (!_auth.AllowAttempt(remote.Address))
+            {
+                await MessageJson.WriteFrameAsync(stream, new AuthFail("RATE_LIMITED"), ct);
+                _log.Warn("ControlServer",
+                    $"{remote}: rate-limited after {_auth.CurrentFailureCount(remote.Address)} failed attempts");
+                return;
+            }
+
             if (!_sessions.IsActive)
             {
                 await MessageJson.WriteFrameAsync(stream, new AuthFail("SESSION_NOT_ACTIVE"), ct);
@@ -112,10 +123,14 @@ public sealed class ControlServer : IAsyncDisposable
             }
             if (!_sessions.ValidateCode(hello.Code))
             {
+                _auth.RecordFailure(remote.Address);
                 await MessageJson.WriteFrameAsync(stream, new AuthFail("INVALID_CODE"), ct);
-                _log.Warn("ControlServer", $"{remote}: invalid code '{hello.Code}' (name={hello.ClientName})");
+                // Deliberately do NOT log the attempted code — tester pass flagged
+                // session codes leaking into rolling log files.
+                _log.Warn("ControlServer", $"{remote}: invalid code (name={hello.ClientName})");
                 return;
             }
+            _auth.RecordSuccess(remote.Address);
 
             var clientId = Guid.NewGuid().ToString("N")[..12];
             registered = _sessions.RegisterClient(new ConnectedClient

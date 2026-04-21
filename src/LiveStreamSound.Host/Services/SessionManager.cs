@@ -53,7 +53,9 @@ public sealed class SessionManager
         Code = SessionCode.Generate();
         SessionId = Guid.NewGuid();
         StartedAt = DateTimeOffset.Now;
-        _log.Info("Session", $"Session started, code={Code}, id={SessionId}");
+        // Deliberately not logging the code — file logs shouldn't contain the secret.
+        // The UI shows it plainly and the client gets it via HELLO anyway.
+        _log.Info("Session", $"Session started, id={SessionId}");
         SessionStateChanged?.Invoke();
         return Code;
     }

@@ -76,7 +76,8 @@ public sealed class HostOrchestrator : IAsyncDisposable
                 sessionName: sessionName ?? Environment.MachineName);
             Capture.Start();
             started++;
-            Log.Info("Orchestrator", $"Session ready. Clients: {LocalIp}:{Control.Port}, audio {AudioServer.Port}, code={code}");
+            // Session code is NOT logged to file — it's a short-lived secret.
+            Log.Info("Orchestrator", $"Session ready. Clients: {LocalIp}:{Control.Port}, audio {AudioServer.Port}");
             return code;
         }
         catch (Exception ex)
@@ -114,18 +115,20 @@ public sealed class HostOrchestrator : IAsyncDisposable
         Log.Info("Orchestrator", "Session stopped");
     }
 
-    // Max Opus packet size per RFC 7845 is 1275 bytes; allocate per frame (50×/s) and let GC
-    // reclaim — ArrayPool would save bytes but timing is dominated by I/O not GC at this rate.
+    // Max Opus packet size per RFC 7845 is 1275 bytes. Reused per frame (50×/s) to
+    // avoid GC pressure. Safe because BroadcastFrameAsync copies the payload into
+    // its own packet buffer synchronously before the first await.
+    private readonly byte[] _opusOutputBuffer = new byte[1275];
+
     private void OnPcmFrame(byte[] pcm)
     {
         Pipeline.NotifyFrame(pcm);
         try
         {
-            var payload = new byte[1275];
-            var encodedLen = Encoder.Encode(pcm, payload);
+            var encodedLen = Encoder.Encode(pcm, _opusOutputBuffer);
             var ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             _ = AudioServer.BroadcastFrameAsync(AudioPayloadType.Opus,
-                new ReadOnlyMemory<byte>(payload, 0, encodedLen), ts);
+                new ReadOnlyMemory<byte>(_opusOutputBuffer, 0, encodedLen), ts);
         }
         catch (Exception ex)
         {
