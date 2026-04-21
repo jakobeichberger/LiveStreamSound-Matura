@@ -60,12 +60,16 @@ public sealed class HostOrchestrator : IAsyncDisposable
         var started = 0;
         try
         {
-            Control.Start(DiscoveryConstants.DefaultControlPort);  // may auto-pick higher
+            // Order matters: bind AudioServer first and set Control.AudioPort
+            // BEFORE starting the TCP accept loop, so the very first WELCOME
+            // message carries the right UDP port even if a client connects
+            // within milliseconds of session start.
+            AudioServer.Start(DiscoveryConstants.DefaultAudioPort);
             started++;
-            AudioServer.Start(DiscoveryConstants.DefaultAudioPort);  // may auto-pick higher
-            started++;
-            // Wire the actual audio port into ControlServer so WELCOME is correct.
             Control.AudioPort = AudioServer.Port;
+
+            Control.Start(DiscoveryConstants.DefaultControlPort);
+            started++;
             MDns.Advertise(
                 instanceName: $"LiveStreamSound-{Environment.MachineName}",
                 controlPort: Control.Port,

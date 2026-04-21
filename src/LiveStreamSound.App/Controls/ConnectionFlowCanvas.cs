@@ -12,8 +12,8 @@ namespace LiveStreamSound.App.Controls;
 ///
 /// Anchor discovery: the canvas walks the visual tree of its owning Window on each
 /// <see cref="FrameworkElement.LayoutUpdated"/> tick and picks up FrameworkElements
-/// with Tag="host-anchor" or Tag="client-anchor". This keeps the XAML dead-simple
-/// — no binding plumbing, just set Tag on the tile templates.
+/// with Tag="host-anchor" or Tag="client-anchor". Bezier control points are
+/// recomputed every frame so layout changes (resize, tile re-layout) follow live.
 /// </summary>
 public sealed class ConnectionFlowCanvas : Canvas
 {
@@ -66,30 +66,32 @@ public sealed class ConnectionFlowCanvas : Canvas
         LayoutUpdated -= OnLayoutUpdated;
     }
 
-    private void OnLayoutUpdated(object? sender, EventArgs e) => RebuildIfChanged();
+    private void OnLayoutUpdated(object? sender, EventArgs e) => SyncAnchorsIfChanged();
 
-    private void RebuildIfChanged()
+    /// <summary>
+    /// Scan the window's visual tree and, if the anchor set changed, rebuild the
+    /// particle ellipses. Geometry (Bezier curves) is NOT stored here — it's
+    /// recomputed every frame in <see cref="OnRender"/> from the live anchor
+    /// positions, so layout shifts follow the particles immediately.
+    /// </summary>
+    private void SyncAnchorsIfChanged()
     {
         var window = Window.GetWindow(this);
         if (window is null) return;
 
-        FrameworkElement? host = null;
-        var clients = new List<FrameworkElement>();
-        Walk(window, host, clients);
+        var newHost = FindByTag(window, "host-anchor");
+        var newClients = new List<FrameworkElement>();
+        CollectByTag(window, "client-anchor", newClients);
 
-        if (host is null && _host is null && _clients.Count == clients.Count && _clients.SequenceEqual(clients))
-            return;
+        var anchorsChanged = !ReferenceEquals(newHost, _host)
+                             || newClients.Count != _clients.Count
+                             || !newClients.SequenceEqual(_clients);
+        if (!anchorsChanged) return;
 
-        _host = FindByTag(window, "host-anchor");
+        _host = newHost;
         _clients.Clear();
-        CollectByTag(window, "client-anchor", _clients);
-
-        Rebuild();
-    }
-
-    private static void Walk(DependencyObject parent, FrameworkElement? host, List<FrameworkElement> clients)
-    {
-        // kept for signature compat; actual collection done in FindByTag/CollectByTag below
+        _clients.AddRange(newClients);
+        RebuildFlowParticles();
     }
 
     private static FrameworkElement? FindByTag(DependencyObject root, string tag)
@@ -99,8 +101,8 @@ public sealed class ConnectionFlowCanvas : Canvas
             var child = VisualTreeHelper.GetChild(root, i);
             if (child is FrameworkElement fe && (fe.Tag as string) == tag)
                 return fe;
-            var recurse = FindByTag(child, tag);
-            if (recurse is not null) return recurse;
+            var nested = FindByTag(child, tag);
+            if (nested is not null) return nested;
         }
         return null;
     }
@@ -116,38 +118,30 @@ public sealed class ConnectionFlowCanvas : Canvas
         }
     }
 
-    private void Rebuild()
+    /// <summary>Allocate exactly the right number of Flow entries and particle Ellipses.</summary>
+    private void RebuildFlowParticles()
     {
         Children.Clear();
         _flows.Clear();
 
-        if (_host is null || _clients.Count == 0 || ActualWidth < 2 || ActualHeight < 2) return;
+        if (_host is null || _clients.Count == 0) return;
 
-        Point hostCenter = CenterInCanvas(_host);
         var color = FlowColor;
-
-        foreach (var client in _clients)
+        for (var c = 0; c < _clients.Count; c++)
         {
-            var p3 = CenterInCanvas(client);
-            if (double.IsNaN(p3.X) || double.IsInfinity(p3.X)) continue;
-
-            // Gentle S-curve: pull control points vertically so lines fan out
-            var dy = p3.Y - hostCenter.Y;
-            var p1 = new Point(hostCenter.X, hostCenter.Y + dy * 0.4);
-            var p2 = new Point(p3.X, p3.Y - dy * 0.4);
-
-            var flow = new Flow(hostCenter, p1, p2, p3);
+            var flow = new Flow();
             for (var i = 0; i < ParticlesPerFlow; i++)
             {
-                var e = new Ellipse
+                var ellipse = new Ellipse
                 {
                     Width = ParticleRadius * 2,
                     Height = ParticleRadius * 2,
                     Fill = new SolidColorBrush(color),
                     Effect = new System.Windows.Media.Effects.BlurEffect { Radius = 2 },
+                    Opacity = 0,
                 };
-                Children.Add(e);
-                flow.Particles.Add(e);
+                Children.Add(ellipse);
+                flow.Particles.Add(ellipse);
                 flow.Offsets.Add(i / (double)ParticlesPerFlow);
             }
             _flows.Add(flow);
@@ -158,6 +152,7 @@ public sealed class ConnectionFlowCanvas : Canvas
     {
         try
         {
+            if (fe.ActualWidth <= 0 || fe.ActualHeight <= 0) return new Point(double.NaN, double.NaN);
             var transform = fe.TransformToVisual(this);
             var bounds = transform.TransformBounds(new Rect(0, 0, fe.ActualWidth, fe.ActualHeight));
             return new Point(bounds.X + bounds.Width / 2, bounds.Y + bounds.Height / 2);
@@ -172,33 +167,54 @@ public sealed class ConnectionFlowCanvas : Canvas
     {
         _timeSeconds += 1 / 60.0;
 
+        if (_host is null || _flows.Count == 0 || ActualWidth < 2 || ActualHeight < 2)
+            return;
+
+        var hostCenter = CenterInCanvas(_host);
+        if (double.IsNaN(hostCenter.X)) return;
+
         // Audio modulates: silence → slow (0.25 laps/sec), loud → fast (0.9 laps/sec).
         // Opacity 0.15 at silence → 0.85 at peak. Capped so it never totally disappears.
         var a = Math.Clamp(AudioLevel, 0, 1);
         var speed = 0.25 + a * 0.65;
-        var opacity = 0.15 + a * 0.70;
+        var peakOpacity = 0.15 + a * 0.70;
 
-        foreach (var flow in _flows)
-            flow.Advance(_timeSeconds, speed, opacity, ParticleRadius);
+        var count = Math.Min(_flows.Count, _clients.Count);
+        for (var fIdx = 0; fIdx < count; fIdx++)
+        {
+            var flow = _flows[fIdx];
+            var clientCenter = CenterInCanvas(_clients[fIdx]);
+            if (double.IsNaN(clientCenter.X))
+            {
+                foreach (var p in flow.Particles) p.Opacity = 0;
+                continue;
+            }
+
+            // Gentle S-curve: vertical control-point pull so fan-out looks natural.
+            var dy = clientCenter.Y - hostCenter.Y;
+            var p1 = new Point(hostCenter.X, hostCenter.Y + dy * 0.4);
+            var p2 = new Point(clientCenter.X, clientCenter.Y - dy * 0.4);
+            flow.Advance(_timeSeconds, speed, peakOpacity, ParticleRadius,
+                         hostCenter, p1, p2, clientCenter);
+        }
     }
 
     private sealed class Flow
     {
-        public Point P0, P1, P2, P3;
         public readonly List<Ellipse> Particles = new();
         public readonly List<double> Offsets = new();
 
-        public Flow(Point p0, Point p1, Point p2, Point p3) { P0 = p0; P1 = p1; P2 = p2; P3 = p3; }
-
-        public void Advance(double time, double speed, double opacity, double radius)
+        public void Advance(
+            double time, double speed, double opacity, double radius,
+            Point p0, Point p1, Point p2, Point p3)
         {
             for (var i = 0; i < Particles.Count; i++)
             {
                 var u = ((time * speed) + Offsets[i]) % 1.0;
-                var pt = CubicBezier(P0, P1, P2, P3, u);
+                var pt = CubicBezier(p0, p1, p2, p3, u);
                 SetLeft(Particles[i], pt.X - radius);
                 SetTop(Particles[i], pt.Y - radius);
-                // Fade in/out at the ends so particles don't pop at anchors
+                // Fade in/out at the ends so particles don't pop at anchors.
                 var endFade = Math.Min(u, 1 - u) * 6;
                 Particles[i].Opacity = opacity * Math.Clamp(endFade, 0, 1);
             }
