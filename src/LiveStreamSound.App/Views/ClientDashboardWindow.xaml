@@ -3,6 +3,7 @@
                  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                  xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
                  xmlns:conv="clr-namespace:LiveStreamSound.App.Converters"
+                 xmlns:ctrl="clr-namespace:LiveStreamSound.App.Controls"
                  xmlns:vm="clr-namespace:LiveStreamSound.App.ViewModels"
                  xmlns:loc="clr-namespace:LiveStreamSound.Shared.Localization;assembly=LiveStreamSound.Shared"
                  Title="LiveStreamSound — Client"
@@ -158,28 +159,73 @@
                            Margin="0,16,0,0" FontSize="16" HorizontalAlignment="Center"/>
             </StackPanel>
 
-            <Grid Grid.Column="0" Visibility="{Binding IsConnected, Converter={StaticResource BoolToVis}}">
-                <StackPanel MaxWidth="520" HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <Border HorizontalAlignment="Center" Margin="0,0,0,16"
-                            Width="88" Height="88" CornerRadius="44"
-                            Background="#16A34A">
-                        <ui:SymbolIcon Symbol="Headphones32" Foreground="White" Width="48" Height="48"
-                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Border>
+            <ScrollViewer Grid.Column="0" Visibility="{Binding IsConnected, Converter={StaticResource BoolToVis}}"
+                          VerticalScrollBarVisibility="Auto" Padding="24">
+                <StackPanel MaxWidth="560" HorizontalAlignment="Center">
                     <TextBlock Text="{Binding [Client.Connected.Title], Source={x:Static loc:Loc.Instance}}"
-                               FontSize="28" FontWeight="Bold" HorizontalAlignment="Center"/>
-                    <TextBlock Text="{Binding [Client.Connected.Subtitle], Source={x:Static loc:Loc.Instance}}"
-                               Opacity="0.7" HorizontalAlignment="Center" TextWrapping="Wrap" Margin="0,8,0,24"
-                               TextAlignment="Center"/>
+                               FontSize="24" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                    <TextBlock Text="{Binding ConnectedHostDisplay}"
+                               FontFamily="Consolas" HorizontalAlignment="Center" Opacity="0.6" Margin="0,0,0,20"/>
+
+                    <!-- Quality ring dashboard -->
+                    <ctrl:QualityRingControl Width="240" Height="240" HorizontalAlignment="Center"
+                                             OverallScore="{Binding OverallScore}"
+                                             LatencyScore="{Binding LatencyScore}"
+                                             LossScore="{Binding LossScore}"
+                                             BufferScore="{Binding BufferScore}"
+                                             Level="{Binding Quality.Level}"
+                                             AutomationProperties.Name="{Binding Quality.Level, Converter={StaticResource QualityLabel}}"/>
+
+                    <!-- Metric sparklines -->
+                    <Grid Margin="0,16,0,20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="80"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition/><RowDefinition/><RowDefinition/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Latenz" Opacity="0.75" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Row="0" Grid.Column="1" VerticalAlignment="Center" FontFamily="Consolas">
+                            <Run Text="{Binding Quality.RoundTripMs, Mode=OneWay}"/> ms
+                        </TextBlock>
+                        <ctrl:SparklineControl Grid.Row="0" Grid.Column="2" Height="18"
+                                               Values="{Binding RttHistory}"
+                                               MinValue="0" MaxValue="200"
+                                               LineBrush="#60A5FA"/>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Verlust" Opacity="0.75" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" FontFamily="Consolas"
+                                   Text="{Binding Quality.PacketLossPercent, StringFormat={}{0:F1} %}"/>
+                        <ctrl:SparklineControl Grid.Row="1" Grid.Column="2" Height="18"
+                                               Values="{Binding LossHistory}"
+                                               MinValue="0" MaxValue="10"
+                                               LineBrush="#A3E635"/>
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Puffer" Opacity="0.75" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Row="2" Grid.Column="1" VerticalAlignment="Center" FontFamily="Consolas">
+                            <Run Text="{Binding Quality.BufferedMs, Mode=OneWay}"/> ms
+                        </TextBlock>
+                        <ctrl:SparklineControl Grid.Row="2" Grid.Column="2" Height="18"
+                                               Values="{Binding BufferHistory}"
+                                               MinValue="0" MaxValue="400"
+                                               LineBrush="#F472B6"/>
+                    </Grid>
+
+                    <Border Background="{DynamicResource SystemFillColorCautionBackgroundBrush}"
+                            CornerRadius="8" Padding="12,10" Margin="0,0,0,16"
+                            Visibility="{Binding HasIssues, Converter={StaticResource BoolToVis}}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding PrimaryIssueTitle}" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding PrimaryIssueBody}" TextWrapping="Wrap" Opacity="0.85"/>
+                        </StackPanel>
+                    </Border>
 
                     <Border Background="{DynamicResource ControlFillColorDefaultBrush}"
                             CornerRadius="8" Padding="16" Margin="0,0,0,16">
                         <StackPanel>
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                <TextBlock Text="{Binding [Client.Connected.Host], Source={x:Static loc:Loc.Instance}}"
-                                           Width="130" Opacity="0.7"/>
-                                <TextBlock Text="{Binding ConnectedHostDisplay}" FontFamily="Consolas"/>
-                            </StackPanel>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="{Binding [Client.OutputDevice], Source={x:Static loc:Loc.Instance}}"
                                            Width="130" Opacity="0.7" VerticalAlignment="Center"/>
@@ -197,7 +243,7 @@
                                Command="{Binding DisconnectCommand}"
                                HorizontalAlignment="Center"/>
                 </StackPanel>
-            </Grid>
+            </ScrollViewer>
 
             <Border Grid.Column="1" Width="360" Padding="16"
                     BorderThickness="1,0,0,0"

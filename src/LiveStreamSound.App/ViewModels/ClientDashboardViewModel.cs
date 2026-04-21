@@ -35,6 +35,17 @@ public partial class ClientDashboardViewModel : ObservableObject
     [ObservableProperty] private string _primaryIssueBody = "";
     [ObservableProperty] private bool _hasIssues;
 
+    // Scores 0-1 for the QualityRingControl
+    [ObservableProperty] private double _latencyScore;
+    [ObservableProperty] private double _lossScore;
+    [ObservableProperty] private double _bufferScore;
+    [ObservableProperty] private double _overallScore;
+
+    private const int HistoryLength = 30;
+    public ObservableCollection<double> RttHistory { get; } = new();
+    public ObservableCollection<double> LossHistory { get; } = new();
+    public ObservableCollection<double> BufferHistory { get; } = new();
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsIdle))]
     [NotifyPropertyChangedFor(nameof(IsConnected))]
@@ -146,7 +157,38 @@ public partial class ClientDashboardViewModel : ObservableObject
                 PrimaryIssueBody = top.Body();
             }
             else { PrimaryIssueTitle = ""; PrimaryIssueBody = ""; }
+
+            LatencyScore = ScoreLatency(q.RoundTripMs);
+            LossScore = ScoreLoss(q.PacketLossPercent);
+            BufferScore = ScoreBuffer(q.BufferedMs);
+            OverallScore = (LatencyScore + LossScore + BufferScore) / 3.0;
+
+            PushHistory(RttHistory, q.RoundTripMs);
+            PushHistory(LossHistory, q.PacketLossPercent);
+            PushHistory(BufferHistory, q.BufferedMs);
         });
+    }
+
+    /// <summary>Latency score: 1.0 at 0ms, 0.0 at 200ms+, linear.</summary>
+    public static double ScoreLatency(int rttMs) =>
+        Math.Clamp(1.0 - rttMs / 200.0, 0, 1);
+
+    /// <summary>Loss score: 1.0 at 0%, 0.0 at 10%+, linear.</summary>
+    public static double ScoreLoss(float lossPct) =>
+        Math.Clamp(1.0 - lossPct / 10.0, 0, 1);
+
+    /// <summary>Buffer score: triangular around the 100ms target, 0 at &lt;20 or &gt;400.</summary>
+    public static double ScoreBuffer(int bufferMs)
+    {
+        if (bufferMs < 20 || bufferMs > 400) return 0;
+        if (bufferMs <= 100) return (bufferMs - 20) / 80.0;
+        return Math.Max(0, 1 - (bufferMs - 100) / 300.0);
+    }
+
+    private static void PushHistory(ObservableCollection<double> coll, double value)
+    {
+        coll.Add(value);
+        while (coll.Count > HistoryLength) coll.RemoveAt(0);
     }
 
     private void HandleLogEntry(LogEntry e) =>
