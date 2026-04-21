@@ -144,7 +144,7 @@ public partial class HostDashboardViewModel : ObservableObject
         {
             _orchestrator.StartSession(Environment.MachineName);
             HostIp = _orchestrator.LocalIp ?? "?";
-            ControlPort = DiscoveryConstants.DefaultControlPort;
+            ControlPort = _orchestrator.Control.Port;  // reflects auto-picked port
             FormattedSessionCode = FormatCodeForDisplay(_orchestrator.Sessions.Code ?? "");
         }
         catch (SessionStartException ex)

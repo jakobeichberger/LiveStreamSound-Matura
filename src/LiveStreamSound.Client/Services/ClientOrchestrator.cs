@@ -103,16 +103,20 @@ public sealed class ClientOrchestrator : IAsyncDisposable
     {
         if (s == ControlClientState.Connected)
         {
-            // Only stop idle-listener once the handshake is actually live. By now
-            // the InvitationResponse has had time to flush out on the invite socket.
+            // Once we have an active session, stop looking for *new* connections:
+            // mDNS browse for other hosts AND the invite listener both go dark until
+            // we disconnect. By this point the InvitationResponse has already
+            // flushed out on the invite socket.
             _ = IdleListener.StopAsync();
+            Discovery.Stop();
         }
         else if (s == ControlClientState.Disconnected || s == ControlClientState.Failed)
         {
             StopPumps();
             _ = AudioIn.Stop();
             Playback.Stop();
-            // Back to idle — accept future host invitations again.
+            // Resume looking for new connections.
+            Discovery.Start();
             IdleListener.Start(SuggestedDisplayName);
         }
     }

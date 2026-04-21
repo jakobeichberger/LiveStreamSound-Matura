@@ -20,6 +20,10 @@ public sealed class ControlServer : IAsyncDisposable
     private Task? _acceptLoopTask;
     public int Port { get; private set; }
 
+    /// <summary>Set by <see cref="HostOrchestrator"/> so WELCOME can report the
+    /// actual UDP audio port (which may differ from DefaultAudioPort).</summary>
+    public int AudioPort { get; set; } = DiscoveryConstants.DefaultAudioPort;
+
     public event Action<ConnectedClient, ClientStatus>? ClientStatusReceived;
 
     public ControlServer(SessionManager sessions, LogService log)
@@ -28,15 +32,42 @@ public sealed class ControlServer : IAsyncDisposable
         _log = log;
     }
 
-    public void Start(int port = DiscoveryConstants.DefaultControlPort)
+    public void Start(int preferredPort = DiscoveryConstants.DefaultControlPort)
     {
         if (_listener is not null) throw new InvalidOperationException("Already started");
-        Port = port;
-        _listener = new TcpListener(IPAddress.Any, port);
-        _listener.Start();
+
+        // Preferred port may be busy (second instance, unrelated app). Try the
+        // preferred one first, then the next few slots, then fall back to an
+        // ephemeral port. The actual port is published via mDNS so clients adapt.
+        System.Net.Sockets.SocketException? lastEx = null;
+        for (var offset = 0; offset < 10 && _listener is null; offset++)
+        {
+            try
+            {
+                var candidate = preferredPort + offset;
+                var listener = new TcpListener(IPAddress.Any, candidate);
+                listener.Start();
+                _listener = listener;
+                Port = candidate;
+                _log.Info("ControlServer", $"Listening on TCP {candidate}");
+            }
+            catch (System.Net.Sockets.SocketException ex)
+            {
+                lastEx = ex;
+            }
+        }
+        if (_listener is null)
+        {
+            var listener = new TcpListener(IPAddress.Any, 0);
+            listener.Start();
+            _listener = listener;
+            Port = ((IPEndPoint)listener.LocalEndpoint).Port;
+            _log.Warn("ControlServer",
+                $"Preferred TCP {preferredPort}+ busy, using ephemeral port {Port}", lastEx);
+        }
+
         _cts = new CancellationTokenSource();
         _acceptLoopTask = Task.Run(() => AcceptLoopAsync(_cts.Token));
-        _log.Info("ControlServer", $"Listening on TCP {port}");
     }
 
     private async Task AcceptLoopAsync(CancellationToken ct)
@@ -97,7 +128,7 @@ public sealed class ControlServer : IAsyncDisposable
 
             var welcome = new Welcome(
                 ClientId: clientId,
-                AudioUdpPort: DiscoveryConstants.DefaultAudioPort,
+                AudioUdpPort: AudioPort,
                 SampleRate: AudioFormat.SampleRate,
                 Channels: AudioFormat.Channels,
                 AudioCodec: "opus",

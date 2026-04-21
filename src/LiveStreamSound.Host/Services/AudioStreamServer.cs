@@ -24,12 +24,31 @@ public sealed class AudioStreamServer : IDisposable
         _log = log;
     }
 
-    public void Start(int port = DiscoveryConstants.DefaultAudioPort)
+    public void Start(int preferredPort = DiscoveryConstants.DefaultAudioPort)
     {
-        Port = port;
-        _udp = new UdpClient(port);
-        _udp.Client.SendBufferSize = 1 << 18;
-        _log.Info("AudioStreamServer", $"UDP audio server on port {port}");
+        SocketException? lastEx = null;
+        for (var offset = 0; offset < 10 && _udp is null; offset++)
+        {
+            try
+            {
+                var candidate = preferredPort + offset;
+                var u = new UdpClient(candidate);
+                u.Client.SendBufferSize = 1 << 18;
+                _udp = u;
+                Port = candidate;
+                _log.Info("AudioStreamServer", $"UDP audio server on port {candidate}");
+            }
+            catch (SocketException ex) { lastEx = ex; }
+        }
+        if (_udp is null)
+        {
+            var u = new UdpClient(0);
+            u.Client.SendBufferSize = 1 << 18;
+            _udp = u;
+            Port = ((IPEndPoint)u.Client.LocalEndPoint!).Port;
+            _log.Warn("AudioStreamServer",
+                $"Preferred UDP {preferredPort}+ busy, using ephemeral port {Port}", lastEx);
+        }
     }
 
     public async Task BroadcastFrameAsync(
