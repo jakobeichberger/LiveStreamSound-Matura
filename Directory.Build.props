@@ -5,7 +5,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Company>Jakob Eichberger</Company>
     <Product>LiveStreamSound-Matura</Product>
-    <Version>0.1.0</Version>
     <Copyright>Copyright (c) 2026 Jakob Eichberger</Copyright>
+    <!--
+      Default version for local dev builds. CI sets -p:Version=... from the
+      latest git tag (see .github/workflows/build-msi-on-demand.yml).
+      MSI expects 4 parts; keep this 4-part too for local compatibility.
+    -->
+    <Version Condition="'$(Version)' == ''">0.2.0.0</Version>
   </PropertyGroup>
 </Project>

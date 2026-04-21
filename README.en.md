@@ -84,15 +84,44 @@ Libraries (Shared/Host/Client) use `EnableWindowsTargeting=true`, so `dotnet res
 
 ### CI (GitHub Actions)
 
-[.github/workflows/build-msi-on-demand.yml](.github/workflows/build-msi-on-demand.yml) builds on every `main` push (and on demand):
+[.github/workflows/build-msi-on-demand.yml](.github/workflows/build-msi-on-demand.yml) builds on-demand only (Actions tab → "Run workflow"):
 
-1. `dotnet restore`
-2. Build all 3 libs (Release)
-3. `dotnet publish` self-contained win-x64 with ReadyToRun
-4. Build WiX MSI project
-5. Upload MSI + portable app as GitHub artifacts
+1. `git describe --tags` → derives version (falls back to `v0.2.0` if no tag)
+2. `dotnet restore` + libs + tests
+3. `dotnet publish` self-contained win-x64 with `-p:Version=...`
+4. Build WiX MSI project → `LiveStreamSound-<version>.msi`
+5. Upload MSI + portable folder as versioned GitHub artifacts
 
 The MSI artifact installs cleanly on a freshly imaged Windows PC without a separate .NET 10 install.
+
+### Versioning
+
+The version is derived from the latest git tag, e.g.:
+- Tag `v0.3.0` → MSI version `0.3.0.0`, artifact `LiveStreamSound-MSI-v0.3.0.0`
+- Tag `v1.0.0-beta.1` → MSI version `1.0.0.0` (pre-release suffix is stripped for MSI)
+- No tag → falls back to `v0.2.0`
+
+**Publish a new version:**
+```bash
+git tag -a v0.3.0 -m "Release v0.3.0"
+git push --tags
+```
+Then trigger the workflow from the Actions tab — it picks up the new tag automatically.
+
+Alternatively, when triggering the workflow manually you can enter an override version (useful for hotfix builds without a tag).
+
+For local dev builds, `-p:Version=0.3.1.0` on `dotnet build/publish` overrides the `Directory.Build.props` default.
+
+### Intune deployment
+
+The MSI is ready for Microsoft Intune deployment as a Line-of-business app — no `.intunewin` wrapping needed. See [docs/intune-deployment.md](docs/intune-deployment.md) for the walkthrough.
+
+Quick version:
+1. Download the MSI from the CI artifact
+2. Intune Admin Center → Apps → Windows apps → Add → Line-of-business
+3. Upload the MSI — metadata is read automatically
+4. Install args: `/quiet /norestart`, assign as Required or Available
+5. Upgrades flow through `MajorUpgrade`; uninstall is clean (firewall rules, event-log source, registry are all removed)
 
 ## Network ports
 
