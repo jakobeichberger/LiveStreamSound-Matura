@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Net;
 using System.Net.Sockets;
 using LiveStreamSound.Shared.Discovery;
@@ -59,23 +60,32 @@ public sealed class AudioStreamServer : IDisposable
     {
         if (_udp is null) return;
         var seq = Interlocked.Increment(ref _sequence);
+        var totalLen = AudioPacket.HeaderSize + encodedPayload.Length;
 
-        var packet = new byte[AudioPacket.HeaderSize + encodedPayload.Length];
-        AudioPacket.Write(packet,
-            new AudioPacketHeader(seq, serverTimestampMs, payloadType, (ushort)encodedPayload.Length),
-            encodedPayload.Span);
-
-        foreach (var client in _sessions.Clients)
+        // ArrayPool-rented buffer keeps the 50 fps broadcast pipeline off the GC.
+        var packet = ArrayPool<byte>.Shared.Rent(totalLen);
+        try
         {
-            if (client.AudioEndpoint is null) continue;
-            try
+            AudioPacket.Write(packet.AsSpan(0, totalLen),
+                new AudioPacketHeader(seq, serverTimestampMs, payloadType, (ushort)encodedPayload.Length),
+                encodedPayload.Span);
+
+            foreach (var client in _sessions.Clients)
             {
-                await _udp.SendAsync(packet, packet.Length, client.AudioEndpoint).ConfigureAwait(false);
+                if (client.AudioEndpoint is null) continue;
+                try
+                {
+                    await _udp.SendAsync(packet, totalLen, client.AudioEndpoint).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    _log.Warn("AudioStreamServer", $"UDP send to {client.ClientId} failed", ex);
+                }
             }
-            catch (Exception ex)
-            {
-                _log.Warn("AudioStreamServer", $"UDP send to {client.ClientId} failed", ex);
-            }
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(packet);
         }
     }
 

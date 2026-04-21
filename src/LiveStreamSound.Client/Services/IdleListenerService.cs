@@ -130,7 +130,9 @@ public sealed class IdleListenerService : IAsyncDisposable
                     return;
                 }
 
-                _log.Info("IdleListener", $"Invitation from '{inv.HostDisplayName}' at {inv.HostAddress}:{inv.HostControlPort} for session {inv.SessionCode}");
+                // Session code deliberately omitted — file logs shouldn't carry the secret.
+                _log.Info("IdleListener",
+                    $"Invitation from '{inv.HostDisplayName}' at {inv.HostAddress}:{inv.HostControlPort}");
 
                 bool accepted = false;
                 if (OnInvitation is not null)

@@ -17,12 +17,32 @@ public sealed class LogService : IDisposable
     public IReadOnlyCollection<LogEntry> Recent => _recent.ToArray();
     public string LogDirectory => _logDirectory;
 
-    public LogService(int capacity = 2_000)
+    public LogService(int capacity = 2_000, int retentionDays = 14)
     {
         _capacity = capacity;
         var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         _logDirectory = Path.Combine(appData, "LiveStreamSound", "LiveStreamSound-Client", "logs");
         Directory.CreateDirectory(_logDirectory);
+        CleanOldLogs(TimeSpan.FromDays(retentionDays));
+    }
+
+    /// <summary>Deletes daily rolling-log files older than <paramref name="retention"/>.</summary>
+    private void CleanOldLogs(TimeSpan retention)
+    {
+        try
+        {
+            var cutoff = DateTime.UtcNow - retention;
+            foreach (var file in Directory.EnumerateFiles(_logDirectory, "*.log"))
+            {
+                try
+                {
+                    if (File.GetLastWriteTimeUtc(file) < cutoff)
+                        File.Delete(file);
+                }
+                catch { /* best effort */ }
+            }
+        }
+        catch { /* best effort */ }
     }
 
     public void Log(LogLevel level, string category, string message, Exception? ex = null)
@@ -31,6 +51,7 @@ public sealed class LogService : IDisposable
         _recent.Enqueue(entry);
         while (_recent.Count > _capacity && _recent.TryDequeue(out _)) { }
         WriteToFile(entry);
+        EventLogSink.Write(level, category, message, ex);
         EntryAdded?.Invoke(entry);
     }
 
