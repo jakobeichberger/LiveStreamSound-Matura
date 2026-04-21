@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:fw="http://wixtoolset.org/schemas/v4/wxs/firewall"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+
+  <Package Name="LiveStreamSound Client"
+           Manufacturer="Jakob Eichberger"
+           Version="0.1.0.0"
+           UpgradeCode="7E4D2F11-19B8-4F9F-9A0D-33B1C2F1A002"
+           Scope="perMachine">
+
+    <MajorUpgrade DowngradeErrorMessage="Eine neuere Version von !(bind.Property.ProductName) ist bereits installiert." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Feature Id="Main" Title="LiveStreamSound Client" Level="1">
+      <Files Include="$(ClientBin)\**" />
+      <ComponentGroupRef Id="ClientShortcuts" />
+      <ComponentGroupRef Id="ClientFirewall" />
+    </Feature>
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="CompanyFolder" Name="LiveStreamSound">
+        <Directory Id="INSTALLFOLDER" Name="Client" />
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ShortcutFolder" Name="LiveStreamSound" />
+    </StandardDirectory>
+
+    <ComponentGroup Id="ClientShortcuts" Directory="ShortcutFolder">
+      <Component Id="ClientAppShortcut" Guid="7E4D2F11-19B8-4F9F-9A0D-33B1C2F1B201">
+        <Shortcut Id="ClientStartMenuShortcut"
+                  Name="LiveStreamSound Client"
+                  Description="Empfängt Audio-Stream vom Host und gibt ihn über HDMI aus"
+                  Target="[INSTALLFOLDER]LiveStreamSound.Client.exe"
+                  WorkingDirectory="INSTALLFOLDER" />
+        <RemoveFolder Id="RemoveClientShortcutFolder" On="uninstall" />
+        <RegistryValue Root="HKCU" Key="Software\LiveStreamSound\Client" Name="installed"
+                       Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <ComponentGroup Id="ClientFirewall" Directory="INSTALLFOLDER">
+      <Component Id="ClientFirewallRules" Guid="7E4D2F11-19B8-4F9F-9A0D-33B1C2F1B202" KeyPath="yes">
+        <RegistryValue Root="HKCU" Key="Software\LiveStreamSound\Client" Name="firewall"
+                       Type="integer" Value="1" />
+        <fw:FirewallException Id="LSS_Client_UDP_In"
+                              Name="LiveStreamSound Client (UDP in)"
+                              Protocol="udp"
+                              Port="5001"
+                              Scope="localSubnet"
+                              Profile="all" />
+      </Component>
+    </ComponentGroup>
+
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+  </Package>
+</Wix>

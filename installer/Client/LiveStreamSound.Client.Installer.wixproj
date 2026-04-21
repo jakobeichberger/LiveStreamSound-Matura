@@ -1,0 +1,20 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <OutputName>LiveStreamSound-Client-$(Version)</OutputName>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <DefineConstants>ClientBin=$(MSBuildThisFileDirectory)..\..\src\LiveStreamSound.Client\bin\$(Configuration)\net10.0-windows</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\LiveStreamSound.Client\LiveStreamSound.Client.csproj">
+      <Name>LiveStreamSound.Client</Name>
+    </ProjectReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" Version="5.0.2" />
+    <PackageReference Include="WixToolset.Firewall.wixext" Version="5.0.2" />
+    <PackageReference Include="WixToolset.Util.wixext" Version="5.0.2" />
+  </ItemGroup>
+</Project>
