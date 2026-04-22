@@ -70,7 +70,10 @@ public sealed class AudioStreamServer : IDisposable
                 new AudioPacketHeader(seq, serverTimestampMs, payloadType, (ushort)encodedPayload.Length),
                 encodedPayload.Span);
 
-            foreach (var client in _sessions.Clients)
+            // ActiveClients skips clients whose TCP just dropped (currently in
+            // grace period) so we don't waste bandwidth spraying UDP at an
+            // endpoint whose owner isn't listening.
+            foreach (var client in _sessions.ActiveClients)
             {
                 if (client.AudioEndpoint is null) continue;
                 try

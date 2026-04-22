@@ -50,12 +50,20 @@ public partial class ClientDashboardViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsIdle))]
     [NotifyPropertyChangedFor(nameof(IsConnected))]
     [NotifyPropertyChangedFor(nameof(IsConnecting))]
+    [NotifyPropertyChangedFor(nameof(IsReconnecting))]
     [NotifyPropertyChangedFor(nameof(CanConnect))]
     private ControlClientState _state = ControlClientState.Idle;
 
-    public bool IsIdle => State is ControlClientState.Idle or ControlClientState.Disconnected or ControlClientState.Failed;
+    [ObservableProperty] private int _reconnectAttempt;
+
+    // Idle: user can edit inputs and click Connect.
+    // IsConnecting: first-time connect underway (no active session yet).
+    // IsReconnecting: had a session, control channel dropped, auto-reconnect loop running.
     public bool IsConnected => State == ControlClientState.Connected;
-    public bool IsConnecting => State is ControlClientState.Connecting or ControlClientState.Authenticating;
+    public bool IsConnecting => !_orchestrator.IsSessionActive &&
+        State is ControlClientState.Connecting or ControlClientState.Authenticating;
+    public bool IsReconnecting => _orchestrator.IsSessionActive && !IsConnected;
+    public bool IsIdle => !IsConnected && !IsConnecting && !IsReconnecting;
     public bool CanConnect => IsIdle;
 
     public string ConnectedHostDisplay { get; private set; } = "";
@@ -81,6 +89,15 @@ public partial class ClientDashboardViewModel : ObservableObject
         _orchestrator.Log.EntryAdded += HandleLogEntry;
         _orchestrator.Discovery.HostsChanged += HandleDiscoveryUpdate;
         _orchestrator.IdleListener.OnInvitation = HandleIncomingInvitation;
+        _orchestrator.ReconnectStatusChanged += () =>
+            _dispatcher.BeginInvoke(() =>
+            {
+                ReconnectAttempt = _orchestrator.ReconnectAttempt;
+                // Re-evaluate the synthetic computed properties.
+                OnPropertyChanged(nameof(IsIdle));
+                OnPropertyChanged(nameof(IsReconnecting));
+                OnPropertyChanged(nameof(CanConnect));
+            });
 
         foreach (var h in _orchestrator.Discovery.CurrentHosts)
             DiscoveredHosts.Add(new DiscoveredHostViewModel(h));
@@ -265,7 +282,7 @@ public partial class ClientDashboardViewModel : ObservableObject
     }
 
     [RelayCommand] private async Task Disconnect() =>
-        await _orchestrator.Control.DisposeAsync();
+        await _orchestrator.DisconnectByUserAsync();
 
     [RelayCommand]
     private void SelectDevice(string deviceId)

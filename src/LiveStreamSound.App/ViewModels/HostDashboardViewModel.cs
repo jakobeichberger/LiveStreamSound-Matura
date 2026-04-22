@@ -50,6 +50,8 @@ public partial class HostDashboardViewModel : ObservableObject
 
         _orchestrator.Sessions.ClientJoined += OnClientJoined;
         _orchestrator.Sessions.ClientLeft += OnClientLeft;
+        _orchestrator.Sessions.ClientReconnecting += OnClientReconnecting;
+        _orchestrator.Sessions.ClientRejoined += OnClientRejoined;
         _orchestrator.Sessions.SessionStateChanged += OnSessionStateChangedHandler;
         _orchestrator.Diagnostics.ClientQualityUpdated += OnClientQualityUpdated;
         _orchestrator.Control.ClientStatusReceived += OnClientStatusHandler;
@@ -110,6 +112,18 @@ public partial class HostDashboardViewModel : ObservableObject
             }
         });
     }
+
+    /// <summary>
+    /// Client's TCP just dropped — keep the tile visible in a "reconnecting"
+    /// state rather than removing it. Gives the teacher a visual cue that
+    /// the client hasn't actually left, just hiccupped.
+    /// </summary>
+    private void OnClientReconnecting(ConnectedClient c) =>
+        _dispatcher.Invoke(() => FindVm(c.ClientId)?.UpdateFromModel());
+
+    /// <summary>Rejoin completed — same ClientId, fresh ConnectedClient. Rebind the tile.</summary>
+    private void OnClientRejoined(ConnectedClient c) =>
+        _dispatcher.Invoke(() => FindVm(c.ClientId)?.Rebind(c));
 
     private void OnClientQualityUpdated(ConnectedClient c) =>
         _dispatcher.Invoke(() => FindVm(c.ClientId)?.UpdateFromModel());

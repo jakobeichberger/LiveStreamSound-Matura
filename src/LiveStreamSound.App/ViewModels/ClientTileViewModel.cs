@@ -11,7 +11,7 @@ namespace LiveStreamSound.App.ViewModels;
 
 public partial class ClientTileViewModel : ObservableObject
 {
-    private readonly ConnectedClient _model;
+    private ConnectedClient _model;
     private readonly ControlServer _control;
     private readonly SessionManager _sessions;
 
@@ -30,6 +30,7 @@ public partial class ClientTileViewModel : ObservableObject
     [ObservableProperty] private string _primaryIssueTitle = "";
     [ObservableProperty] private string _primaryIssueBody = "";
     [ObservableProperty] private bool _hasIssues;
+    [ObservableProperty] private bool _isReconnecting;
 
     public ClientTileViewModel(ConnectedClient model, ControlServer control, SessionManager sessions)
     {
@@ -59,7 +60,8 @@ public partial class ClientTileViewModel : ObservableObject
         if (result == MessageBoxResult.OK)
         {
             _ = _control.SendAsync(_model, new Kick("Host closed connection"));
-            _sessions.UnregisterClient(_model.ClientId);
+            // HardUnregister so the client is removed immediately, not parked in the grace period.
+            _sessions.HardUnregisterClient(_model.ClientId);
         }
     }
 
@@ -76,6 +78,7 @@ public partial class ClientTileViewModel : ObservableObject
         IsMuted = _model.IsMuted;
         Quality = _model.CurrentQuality;
         CurrentDeviceId = _model.CurrentOutputDeviceId;
+        IsReconnecting = _model.IsReconnecting;
         HasIssues = Quality.ActiveIssues.Count > 0;
         if (HasIssues)
         {
@@ -88,6 +91,16 @@ public partial class ClientTileViewModel : ObservableObject
             PrimaryIssueTitle = "";
             PrimaryIssueBody = "";
         }
+    }
+
+    /// <summary>
+    /// Called after a rejoin (same ClientId, fresh ConnectedClient instance).
+    /// Re-points the tile at the new model and refreshes the UI bindings.
+    /// </summary>
+    public void Rebind(ConnectedClient model)
+    {
+        _model = model;
+        UpdateFromModel();
     }
 
     public void UpdateAvailableDevices(OutputDeviceInfo[] devices)

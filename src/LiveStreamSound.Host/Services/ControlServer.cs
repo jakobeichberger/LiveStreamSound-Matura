@@ -132,23 +132,52 @@ public sealed class ControlServer : IAsyncDisposable
             }
             _auth.RecordSuccess(remote.Address);
 
-            var clientId = Guid.NewGuid().ToString("N")[..12];
-            registered = _sessions.RegisterClient(new ConnectedClient
+            var effectiveName = string.IsNullOrWhiteSpace(hello.ClientName)
+                ? $"Client-{Guid.NewGuid().ToString("N")[..8]}"
+                : hello.ClientName;
+
+            // First check if this is a rejoining client (same name, TCP
+            // dropped within the grace period). If so, reuse the old
+            // ClientId + preserved volume/mute/device settings so the teacher
+            // doesn't lose any per-client config across a WLAN hiccup.
+            var existing = _sessions.TryFindReconnectingByName(effectiveName);
+            if (existing is not null)
             {
-                ClientId = clientId,
-                ClientName = string.IsNullOrWhiteSpace(hello.ClientName) ? $"Client-{clientId}" : hello.ClientName,
-                TcpClient = tcp,
-                TcpEndpoint = remote,
-            });
+                existing.TcpClient = tcp;
+                existing.TcpEndpoint = remote;
+                existing.WriteLock = new SemaphoreSlim(1, 1);
+                _sessions.FinalizeRejoin(existing);
+                registered = existing;
+            }
+            else
+            {
+                var clientId = Guid.NewGuid().ToString("N")[..12];
+                registered = _sessions.RegisterClient(new ConnectedClient
+                {
+                    ClientId = clientId,
+                    ClientName = effectiveName,
+                    TcpClient = tcp,
+                    TcpEndpoint = remote,
+                });
+            }
 
             var welcome = new Welcome(
-                ClientId: clientId,
+                ClientId: registered.ClientId,
                 AudioUdpPort: AudioPort,
                 SampleRate: AudioFormat.SampleRate,
                 Channels: AudioFormat.Channels,
                 AudioCodec: "opus",
                 ServerTimeMs: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
             await SendOnStreamAsync(registered, stream, welcome, ct);
+
+            // For a rejoin: push the preserved volume/mute/device back down so
+            // the client restores the exact state the teacher had configured.
+            if (registered.Volume != 1.0f)
+                await SendOnStreamAsync(registered, stream, new SetVolume(registered.Volume), ct);
+            if (registered.IsMuted)
+                await SendOnStreamAsync(registered, stream, new SetMute(true), ct);
+            if (!string.IsNullOrEmpty(registered.CurrentOutputDeviceId))
+                await SendOnStreamAsync(registered, stream, new SetOutputDevice(registered.CurrentOutputDeviceId), ct);
 
             // Message loop
             while (!ct.IsCancellationRequested && tcp.Connected)
