@@ -159,6 +159,40 @@
                            Margin="0,16,0,0" FontSize="16" HorizontalAlignment="Center"/>
             </StackPanel>
 
+            <!-- Self-healing reconnect overlay: shown whenever the session is
+                 active but the control channel is momentarily down. Keeps the
+                 user informed + non-scary + lets them cancel via Disconnect. -->
+            <StackPanel Grid.Column="0" HorizontalAlignment="Center" VerticalAlignment="Center"
+                        MaxWidth="440"
+                        Visibility="{Binding IsReconnecting, Converter={StaticResource BoolToVis}}">
+                <Border Background="{DynamicResource SystemFillColorCautionBackgroundBrush}"
+                        CornerRadius="12" Padding="24,20">
+                    <StackPanel HorizontalAlignment="Center">
+                        <ui:ProgressRing IsIndeterminate="True" Width="44" Height="44"
+                                         HorizontalAlignment="Center"
+                                         AutomationProperties.Name="{Binding [Client.Reconnecting.Title], Source={x:Static loc:Loc.Instance}}"/>
+                        <TextBlock Text="{Binding [Client.Reconnecting.Title], Source={x:Static loc:Loc.Instance}}"
+                                   FontSize="18" FontWeight="SemiBold"
+                                   HorizontalAlignment="Center" Margin="0,16,0,4"/>
+                        <TextBlock Text="{Binding [Client.Reconnecting.Body], Source={x:Static loc:Loc.Instance}}"
+                                   TextWrapping="Wrap" Opacity="0.85"
+                                   HorizontalAlignment="Center" TextAlignment="Center" Margin="0,0,0,8"/>
+                        <TextBlock HorizontalAlignment="Center" Opacity="0.7" FontSize="12">
+                            <Run Text="{Binding [Client.Reconnecting.Attempt], Source={x:Static loc:Loc.Instance}, Mode=OneWay}"/>
+                            <Run Text="{Binding ReconnectAttempt, Mode=OneWay}"/>
+                        </TextBlock>
+                        <TextBlock Text="{Binding [Client.Reconnecting.Hint], Source={x:Static loc:Loc.Instance}}"
+                                   TextWrapping="Wrap" Opacity="0.6" FontSize="11"
+                                   HorizontalAlignment="Center" TextAlignment="Center" Margin="0,12,0,16"/>
+                        <ui:Button Appearance="Secondary"
+                                   Icon="{ui:SymbolIcon PlugDisconnected24}"
+                                   Content="{Binding [Disconnect], Source={x:Static loc:Loc.Instance}}"
+                                   Command="{Binding DisconnectCommand}"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
             <ScrollViewer Grid.Column="0" Visibility="{Binding IsConnected, Converter={StaticResource BoolToVis}}"
                           VerticalScrollBarVisibility="Auto" Padding="24">
                 <StackPanel MaxWidth="560" HorizontalAlignment="Center">

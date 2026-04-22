@@ -6,7 +6,7 @@ using LiveStreamSound.Shared.Protocol;
 
 namespace LiveStreamSound.Client.Services;
 
-public enum ControlClientState { Idle, Connecting, Authenticating, Connected, Disconnected, Failed }
+public enum ControlClientState { Idle, Connecting, Authenticating, Connected, Reconnecting, Disconnected, Failed }
 
 public sealed class ControlClient : IAsyncDisposable
 {
@@ -16,10 +16,22 @@ public sealed class ControlClient : IAsyncDisposable
     private NetworkStream? _stream;
     private CancellationTokenSource? _cts;
     private Task? _readLoop;
+    private Timer? _pongWatchdog;
     public Welcome? Welcome { get; private set; }
     public ControlClientState State { get; private set; } = ControlClientState.Idle;
     public IPAddress? HostAddress { get; private set; }
     public int HostControlPort { get; private set; }
+
+    /// <summary>
+    /// Last time we got *any* frame back from the host. Used by the pong-watchdog
+    /// to treat a silent-but-not-yet-closed TCP connection as dead (which can
+    /// happen with Wi-Fi dropouts — the socket stays "connected" for minutes
+    /// before the OS times it out).
+    /// </summary>
+    public DateTimeOffset LastInboundFrameAt { get; private set; } = DateTimeOffset.MinValue;
+
+    /// <summary>Seconds without an inbound frame after which we force-tear the TCP down.</summary>
+    public int InboundSilenceTimeoutSeconds { get; set; } = 8;
 
     public event Action<ControlClientState>? StateChanged;
     public event Action<ControlMessage>? MessageReceived;
@@ -32,6 +44,12 @@ public sealed class ControlClient : IAsyncDisposable
         State = s;
         StateChanged?.Invoke(s);
     }
+
+    /// <summary>
+    /// Called by the orchestrator when it transitions into Reconnecting so the
+    /// UI reflects the intent rather than the transient Disconnected state.
+    /// </summary>
+    internal void MarkReconnecting() => SetState(ControlClientState.Reconnecting);
 
     public async Task<Welcome?> ConnectAsync(
         IPAddress host,
@@ -61,9 +79,16 @@ public sealed class ControlClient : IAsyncDisposable
             {
                 case Welcome welcome:
                     Welcome = welcome;
+                    LastInboundFrameAt = DateTimeOffset.UtcNow;
                     SetState(ControlClientState.Connected);
                     _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
                     _readLoop = Task.Run(() => ReadLoopAsync(_cts.Token));
+                    // Watchdog: if we don't hear anything from the host (pong,
+                    // status echo, anything) for InboundSilenceTimeoutSeconds,
+                    // rip the socket down so the reconnect loop kicks in rather
+                    // than letting a silently-dead Wi-Fi connection linger.
+                    _pongWatchdog = new Timer(_ => CheckInboundSilence(), null,
+                        TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2));
                     _log.Info("ControlClient", $"Connected to {host}:{controlPort} as '{clientName}' (id={welcome.ClientId})");
                     return welcome;
 
@@ -95,6 +120,7 @@ public sealed class ControlClient : IAsyncDisposable
             {
                 var msg = await MessageJson.ReadFrameAsync(_stream, ct).ConfigureAwait(false);
                 if (msg is null) break;
+                LastInboundFrameAt = DateTimeOffset.UtcNow;
                 MessageReceived?.Invoke(msg);
             }
         }
@@ -106,7 +132,28 @@ public sealed class ControlClient : IAsyncDisposable
         }
         finally
         {
-            SetState(ControlClientState.Disconnected);
+            // Only flip to Disconnected if we're not already reconnecting — the
+            // orchestrator may have already moved us to Reconnecting and we
+            // don't want to regress the UI state.
+            if (State == ControlClientState.Connected ||
+                State == ControlClientState.Connecting ||
+                State == ControlClientState.Authenticating)
+                SetState(ControlClientState.Disconnected);
+        }
+    }
+
+    private void CheckInboundSilence()
+    {
+        if (State != ControlClientState.Connected) return;
+        var silenceSeconds = (DateTimeOffset.UtcNow - LastInboundFrameAt).TotalSeconds;
+        if (silenceSeconds >= InboundSilenceTimeoutSeconds)
+        {
+            _log.Warn("ControlClient",
+                $"No inbound traffic for {silenceSeconds:F1}s — tearing down stale TCP so reconnect can take over");
+            // Close underlying socket so the read loop exits. The orchestrator's
+            // state-change handler decides whether to reconnect.
+            try { _tcp?.Close(); } catch { }
+            try { _stream?.Close(); } catch { }
         }
     }
 
@@ -140,6 +187,8 @@ public sealed class ControlClient : IAsyncDisposable
         {
             try { await _readLoop.ConfigureAwait(false); } catch { }
         }
+        _pongWatchdog?.Dispose();
+        _pongWatchdog = null;
         _stream = null;
         _tcp = null;
         _cts?.Dispose();

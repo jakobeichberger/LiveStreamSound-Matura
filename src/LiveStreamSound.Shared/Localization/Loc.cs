@@ -212,6 +212,20 @@ public sealed class Loc : INotifyPropertyChanged
         ["Client.PacketLoss"] = new("Paketverlust (%)", "Packet loss (%)"),
         ["Client.Rooms.Suggested"] = new("Vorschlag", "Suggested"),
 
+        // Self-healing reconnect UX
+        ["Client.Reconnecting.Title"] = new("Verbindung wird wiederhergestellt…", "Reconnecting…"),
+        ["Client.Reconnecting.Body"] = new(
+            "Die Verbindung zum Host wurde unterbrochen — ich versuche sie automatisch wieder aufzunehmen. Klick auf »Trennen«, um abzubrechen.",
+            "The connection to the host dropped — I'll reconnect automatically. Click \"Disconnect\" to cancel."),
+        ["Client.Reconnecting.Attempt"] = new("Versuch {0}", "Attempt {0}"),
+        ["Client.Reconnecting.Hint"] = new(
+            "Einstellungen (Lautstärke, Ausgabegerät) bleiben erhalten.",
+            "Your settings (volume, output device) are preserved."),
+        ["Host.ClientReconnecting"] = new("Verbindet neu…", "Reconnecting…"),
+        ["Host.ClientReconnectingHint"] = new(
+            "Client hat die Verbindung verloren. Ich behalte den Platz {0} Sekunden lang frei.",
+            "Client lost its connection. I'll hold the slot for {0} seconds."),
+
         // Quality badges
         ["Quality.Good"] = new("Gut", "Good"),
         ["Quality.Degraded"] = new("Einschränkungen", "Degraded"),

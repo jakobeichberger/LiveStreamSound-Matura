@@ -166,6 +166,7 @@ public sealed class HostOrchestrator : IAsyncDisposable
         IdleClientDiscovery.Dispose();
         Capture.Dispose();
         Diagnostics.Dispose();
+        Sessions.Dispose();
         Log.Dispose();
     }
 }

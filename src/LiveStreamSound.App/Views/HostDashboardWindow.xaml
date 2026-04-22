@@ -181,6 +181,16 @@
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate DataType="{x:Type vm:ClientTileViewModel}">
                                                 <ui:Card Margin="0,4" Tag="client-anchor">
+                                                    <ui:Card.Style>
+                                                        <Style TargetType="ui:Card">
+                                                            <Setter Property="Opacity" Value="1"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsReconnecting}" Value="True">
+                                                                    <Setter Property="Opacity" Value="0.65"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </ui:Card.Style>
                                                     <Grid>
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="Auto"/>
@@ -259,6 +269,21 @@
                                                             <StackPanel>
                                                                 <TextBlock Text="{Binding PrimaryIssueTitle}" FontWeight="SemiBold"/>
                                                                 <TextBlock Text="{Binding PrimaryIssueBody}" TextWrapping="Wrap" Opacity="0.8"/>
+                                                            </StackPanel>
+                                                        </Border>
+
+                                                        <!-- Reconnect overlay: tile greyed via Opacity binding above,
+                                                             this label communicates the "hold on, client's coming back" state. -->
+                                                        <Border Grid.ColumnSpan="3" Grid.Row="2" Margin="0,8,0,0"
+                                                                CornerRadius="6" Padding="10,8"
+                                                                Background="{DynamicResource AccentFillColorDefaultBrush}"
+                                                                Visibility="{Binding IsReconnecting, Converter={StaticResource BoolToVis}}">
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <ui:ProgressRing IsIndeterminate="True" Width="16" Height="16"
+                                                                                 VerticalAlignment="Center"/>
+                                                                <TextBlock Text="{Binding [Host.ClientReconnecting], Source={x:Static loc:Loc.Instance}}"
+                                                                           VerticalAlignment="Center" Margin="10,0,0,0"
+                                                                           FontWeight="SemiBold"/>
                                                             </StackPanel>
                                                         </Border>
                                                     </Grid>
