@@ -100,6 +100,19 @@
                                Content="{Binding [Invite.OpenInviteDialog], Source={x:Static loc:Loc.Instance}}"
                                Command="{Binding OpenInviteDialogCommand}"
                                Visibility="{Binding IsSessionActive, Converter={StaticResource BoolToVis}}"/>
+
+                    <!-- Host self-mute toggle: keeps the teacher's laptop quiet
+                         while the stream goes out to clients. Persisted across launches. -->
+                    <StackPanel Margin="24,0,0,0" VerticalAlignment="Center" Orientation="Horizontal"
+                                ToolTip="{Binding [Host.AutoMuteTooltip], Source={x:Static loc:Loc.Instance}}">
+                        <ui:SymbolIcon Symbol="SpeakerMute24" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                        <StackPanel>
+                            <TextBlock Text="{Binding [Host.AutoMuteToggle], Source={x:Static loc:Loc.Instance}}"
+                                       FontSize="11" Opacity="0.7"/>
+                            <ui:ToggleSwitch IsChecked="{Binding AutoMuteHostMonitor, Mode=TwoWay}"
+                                             AutomationProperties.Name="{Binding [Host.AutoMuteToggle], Source={x:Static loc:Loc.Instance}}"/>
+                        </StackPanel>
+                    </StackPanel>
                 </StackPanel>
 
                 <!-- Global actions -->
@@ -137,6 +150,27 @@
                                    IsHitTestVisible="False"
                                    Panel.ZIndex="50"
                                    ClipToBounds="True"/>
+
+        <!-- Floating idle-client notifications: bottom-right corner, stack of cards.
+             Each toast slides in + breathes; click "+" to invite, click "x" to dismiss
+             (suppresses for 60s before re-showing if the client stays idle). -->
+        <ItemsControl Grid.Row="2"
+                      ItemsSource="{Binding IdleClientNotifications}"
+                      HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                      Margin="0,0,16,16"
+                      IsHitTestVisible="True"
+                      Panel.ZIndex="100">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel Orientation="Vertical"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="{x:Type vm:IdleClientNotificationViewModel}">
+                    <ctrl:IdleClientToast/>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
 
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>

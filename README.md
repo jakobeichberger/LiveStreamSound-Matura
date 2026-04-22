@@ -24,6 +24,9 @@ Dieselbe `.exe`. Rolle kann zur Laufzeit im Burger-Menü gewechselt werden.
 - 🔒 6-stelliger Session-Code, keine Passwörter
 - 🔍 Automatische Discovery per mDNS + Fallback manuelle IP
 - 📨 **Host kann Clients aktiv einladen** (Client bestätigt mit Accept/Reject-Dialog) — Lehrer muss nicht mehr zum Raum-PC gehen
+- ✨ **Idle-Client-Toasts** im Host-Dashboard: wartende Raum-PCs erscheinen unten rechts als animierte Karten mit »+« zum Hinzufügen — kein Dialog-Wechsel nötig
+- 👨‍🏫 **Lehrer-Modus / Techniker-Modus** im Client-Dashboard: Standard-Ansicht zeigt nur einen pulsierenden Heartbeat + Klartext-Status, Techniker-Ansicht entfaltet Sparklines und alle Metriken
+- 🔇 **Auto-Mute am Host**: Lehrer-Lautsprecher werden während der Session stummgeschaltet (Stream zu Clients läuft weiter), beim Stoppen wird der Vorzustand wiederhergestellt
 - ⏱️ Synchrone Wiedergabe auf allen Clients (Timestamp-basierter Jitter-Buffer, NTP-like Clock-Sync)
 - 🎚️ Pro-Client Fernsteuerung: Lautstärke, Stumm, Ausgabegerät, Kick
 - 🏷️ Automatische Erkennung der Raum-Nummer aus dem Hostnamen (`HP-KB-017` → „Raum 017"), kategorisiert nach Klassenraum / Werkstatt / Sonstige

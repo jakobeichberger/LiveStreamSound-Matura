@@ -34,6 +34,9 @@ public sealed class IdleClientDiscoveryService : IDisposable
 
     public void Start()
     {
+        // Idempotent: callers from both the dashboard (auto-start on session)
+        // and the invite dialog (manual open) shouldn't double-up the listener.
+        if (_sd is not null) return;
         try
         {
             _mc = new MulticastService(nics => nics.Where(NetworkInterfaceFilter.IsRealLan).ToList());

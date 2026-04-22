@@ -19,6 +19,9 @@ public sealed class AppShell
     public HostOrchestrator? Host { get; private set; }
     public ClientOrchestrator? Client { get; private set; }
 
+    /// <summary>Persistent UI/behaviour preferences (technician mode, host auto-mute, …).</summary>
+    public UserSettingsService Settings { get; } = new();
+
     private Window? _currentWindow;
 
     public void ShowRoleSelection()

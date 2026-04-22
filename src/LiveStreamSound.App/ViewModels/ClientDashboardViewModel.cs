@@ -24,11 +24,21 @@ public partial class ClientDashboardViewModel : ObservableObject
     [ObservableProperty] private string _displayName;
     [ObservableProperty] private string _connectionError = "";
     [ObservableProperty] private string _connectionErrorBody = "";
-    [ObservableProperty] private ConnectionQuality _quality =
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PlainStatusHeadline))]
+    [NotifyPropertyChangedFor(nameof(PlainStatusBody))]
+    [NotifyPropertyChangedFor(nameof(HeartbeatColor))]
+    private ConnectionQuality _quality =
         new(0, 0, 0, 0, Array.Empty<ConnectionIssue>(), QualityLevel.Disconnected);
     [ObservableProperty] private bool _isHelpOpen;
     [ObservableProperty] private bool _isLogOpen;
     [ObservableProperty] private bool _isDarkTheme = true;
+    /// <summary>
+    /// Persisted toggle: false = simple "Lehrer-Modus" (one big status card,
+    /// plain-language verdict, animated heartbeat). True = "Techniker-Modus"
+    /// (sparklines, RTT/loss/buffer numbers, raw issue list).
+    /// </summary>
+    [ObservableProperty] private bool _isTechnicianMode;
     [ObservableProperty] private ObservableCollection<AudioOutputDevice> _outputDevices = new();
     [ObservableProperty] private string? _selectedOutputDeviceId;
     [ObservableProperty] private string _primaryIssueTitle = "";
@@ -52,6 +62,9 @@ public partial class ClientDashboardViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsConnecting))]
     [NotifyPropertyChangedFor(nameof(IsReconnecting))]
     [NotifyPropertyChangedFor(nameof(CanConnect))]
+    [NotifyPropertyChangedFor(nameof(PlainStatusHeadline))]
+    [NotifyPropertyChangedFor(nameof(PlainStatusBody))]
+    [NotifyPropertyChangedFor(nameof(HeartbeatColor))]
     private ControlClientState _state = ControlClientState.Idle;
 
     [ObservableProperty] private int _reconnectAttempt;
@@ -79,6 +92,7 @@ public partial class ClientDashboardViewModel : ObservableObject
         _dispatcher = Dispatcher.CurrentDispatcher;
         _displayName = _orchestrator.SuggestedDisplayName;
         IsDarkTheme = ApplicationThemeManager.GetAppTheme() == ApplicationTheme.Dark;
+        IsTechnicianMode = AppShell.Current.Settings.Current.ClientTechnicianMode;
 
         RefreshOutputDevices();
 
@@ -300,6 +314,54 @@ public partial class ClientDashboardViewModel : ObservableObject
     }
     [RelayCommand] private void ToggleHelp() => IsHelpOpen = !IsHelpOpen;
     [RelayCommand] private void ToggleLog() => IsLogOpen = !IsLogOpen;
+
+    [RelayCommand]
+    private void ToggleTechnicianMode()
+    {
+        IsTechnicianMode = !IsTechnicianMode;
+        AppShell.Current.Settings.Current.ClientTechnicianMode = IsTechnicianMode;
+        AppShell.Current.Settings.Save();
+    }
+
+    /// <summary>
+    /// Plain-language one-liner for the simple-mode hero card. Switches
+    /// between "everything's good", "I'm working on the connection",
+    /// "connected but quality dropped" — without exposing the raw enum.
+    /// </summary>
+    public string PlainStatusHeadline =>
+        State switch
+        {
+            ControlClientState.Connected when Quality.Level == QualityLevel.Good
+                => Loc.Instance.Get("Client.Plain.AllGood"),
+            ControlClientState.Connected when Quality.Level == QualityLevel.Degraded
+                => Loc.Instance.Get("Client.Plain.Degraded"),
+            ControlClientState.Connected when Quality.Level == QualityLevel.Bad
+                => Loc.Instance.Get("Client.Plain.Bad"),
+            ControlClientState.Reconnecting
+                => Loc.Instance.Get("Client.Plain.Reconnecting"),
+            _ when _orchestrator.IsSessionActive
+                => Loc.Instance.Get("Client.Plain.Reconnecting"),
+            _ => Loc.Instance.Get("Client.Plain.NotConnected"),
+        };
+
+    /// <summary>One sentence of supporting copy under the headline.</summary>
+    public string PlainStatusBody =>
+        HasIssues ? PrimaryIssueBody :
+        State == ControlClientState.Connected
+            ? Loc.Instance.Get("Client.Plain.AllGoodBody")
+            : "";
+
+    /// <summary>Heartbeat ring color hint for the simple-mode hero card. WPF
+    /// XAML reads this name via a converter or just bound to a Brush via
+    /// <see cref="QualityLevelToBrushConverter"/> in code-behind binding.</summary>
+    public QualityLevel HeartbeatColor =>
+        State switch
+        {
+            ControlClientState.Connected => Quality.Level,
+            ControlClientState.Reconnecting => QualityLevel.Bad,
+            _ when _orchestrator.IsSessionActive => QualityLevel.Bad,
+            _ => QualityLevel.Disconnected,
+        };
 
     [RelayCommand]
     private void CloseSidePanels()

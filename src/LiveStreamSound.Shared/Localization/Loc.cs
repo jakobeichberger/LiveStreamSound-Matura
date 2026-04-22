@@ -107,6 +107,12 @@ public sealed class Loc : INotifyPropertyChanged
         ["Host.GroupWorkshop"] = new("Werkstatt", "Workshop"),
         ["Host.GroupRooms"] = new("Räume", "Rooms"),
         ["Host.GroupOther"] = new("Sonstige Geräte", "Other devices"),
+        ["Host.AutoMuteToggle"] = new(
+            "Host stumm während Session",
+            "Mute host during session"),
+        ["Host.AutoMuteTooltip"] = new(
+            "Schaltet die Lautsprecher des Lehrer-Laptops stumm, sobald die Session startet — Clients hören den Stream weiter. Beim Beenden wird der vorige Zustand wiederhergestellt.",
+            "Mutes the teacher laptop's own speakers when a session starts — clients still hear the stream. The previous state is restored on stop."),
 
         // Session start errors (host side)
         ["Host.Error.PortInUse.Title"] = new("Port belegt", "Port in use"),
@@ -198,6 +204,17 @@ public sealed class Loc : INotifyPropertyChanged
         ["Incoming.Accept"] = new("Annehmen", "Accept"),
         ["Incoming.Reject"] = new("Ablehnen", "Decline"),
 
+        // Idle-client toast notifications on the Host dashboard
+        ["Notification.IdleClient.Subtitle"] = new(
+            "Wartet auf Einladung",
+            "Waiting for invitation"),
+        ["Notification.IdleClient.AddTooltip"] = new(
+            "Diesen Raum mit einem Klick zur Sitzung hinzufügen",
+            "Add this room to the session in one click"),
+        ["Notification.IdleClient.DismissTooltip"] = new(
+            "Benachrichtigung ausblenden",
+            "Dismiss notification"),
+
         // Client
         ["Client.DiscoveredHosts"] = new("Gefundene Hosts", "Discovered hosts"),
         ["Client.ManualEntry"] = new("Manuell eingeben", "Manual entry"),
@@ -211,6 +228,21 @@ public sealed class Loc : INotifyPropertyChanged
         ["Client.Rtt"] = new("Latenz (ms)", "Latency (ms)"),
         ["Client.PacketLoss"] = new("Paketverlust (%)", "Packet loss (%)"),
         ["Client.Rooms.Suggested"] = new("Vorschlag", "Suggested"),
+
+        // Simple "Lehrer-Modus" hero copy
+        ["Client.Plain.AllGood"] = new("Alles läuft", "All set"),
+        ["Client.Plain.AllGoodBody"] = new(
+            "Du hörst den Ton vom Host-Laptop, sobald dort etwas abgespielt wird.",
+            "You'll hear audio as soon as the host plays something."),
+        ["Client.Plain.Degraded"] = new("Verbunden — Qualität schwankt", "Connected — quality fluctuating"),
+        ["Client.Plain.Bad"] = new("Verbunden, aber Probleme", "Connected, but with issues"),
+        ["Client.Plain.Reconnecting"] = new("Ich stelle die Verbindung wieder her…", "Restoring the connection…"),
+        ["Client.Plain.NotConnected"] = new("Noch nicht verbunden", "Not connected yet"),
+        ["Client.View.Simple"] = new("Lehrer-Ansicht", "Teacher view"),
+        ["Client.View.Technician"] = new("Techniker-Ansicht", "Technician view"),
+        ["Client.View.ToggleTooltip"] = new(
+            "Zwischen einfacher Ansicht (Lehrer) und detaillierter Ansicht (Techniker) wechseln",
+            "Switch between simple (teacher) and detailed (technician) view"),
 
         // Self-healing reconnect UX
         ["Client.Reconnecting.Title"] = new("Verbindung wird wiederhergestellt…", "Reconnecting…"),
