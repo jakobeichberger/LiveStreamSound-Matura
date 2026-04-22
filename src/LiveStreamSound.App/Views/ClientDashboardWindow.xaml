@@ -63,6 +63,24 @@
                            Command="{Binding SwitchRoleCommand}" Margin="0,0,8,0"
                            ToolTip="{Binding [App.SwitchRole], Source={x:Static loc:Loc.Instance}}"
                            AutomationProperties.Name="{Binding [App.SwitchRole], Source={x:Static loc:Loc.Instance}}"/>
+                <!-- Lehrer ↔ Techniker view toggle. Wrench icon = "currently in
+                     simple mode, click for tech view"; Person icon = "currently in
+                     tech mode, click to go back to simple". -->
+                <ui:Button Margin="0,0,8,0"
+                           Command="{Binding ToggleTechnicianModeCommand}"
+                           ToolTip="{Binding [Client.View.ToggleTooltip], Source={x:Static loc:Loc.Instance}}"
+                           AutomationProperties.Name="{Binding [Client.View.ToggleTooltip], Source={x:Static loc:Loc.Instance}}">
+                    <ui:Button.Style>
+                        <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                            <Setter Property="Icon" Value="{ui:SymbolIcon Wrench24}"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsTechnicianMode}" Value="True">
+                                    <Setter Property="Icon" Value="{ui:SymbolIcon Person24}"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ui:Button.Style>
+                </ui:Button>
                 <ui:Button Icon="{ui:SymbolIcon QuestionCircle24}"
                            Command="{Binding ToggleHelpCommand}" Margin="0,0,8,0"
                            ToolTip="{Binding [A11y.HelpButton], Source={x:Static loc:Loc.Instance}}"
@@ -201,6 +219,24 @@
                     <TextBlock Text="{Binding ConnectedHostDisplay}"
                                FontFamily="Consolas" HorizontalAlignment="Center" Opacity="0.6" Margin="0,0,0,20"/>
 
+                    <!-- LEHRER-MODUS (default): one big plain-language status card.
+                         Heartbeat ring pulses in time with the connection health. -->
+                    <StackPanel HorizontalAlignment="Center" Margin="0,8,0,16"
+                                Visibility="{Binding IsTechnicianMode, Converter={StaticResource BoolToVisInv}}">
+                        <ctrl:HeartbeatRing Level="{Binding HeartbeatColor}"
+                                            HorizontalAlignment="Center"
+                                            AutomationProperties.Name="{Binding HeartbeatColor, Converter={StaticResource QualityLabel}}"/>
+                        <TextBlock Text="{Binding PlainStatusHeadline}"
+                                   FontSize="22" FontWeight="SemiBold"
+                                   HorizontalAlignment="Center" Margin="0,18,0,6"/>
+                        <TextBlock Text="{Binding PlainStatusBody}"
+                                   TextWrapping="Wrap" Opacity="0.8" MaxWidth="440"
+                                   HorizontalAlignment="Center" TextAlignment="Center"/>
+                    </StackPanel>
+
+                    <!-- TECHNIKER-MODUS: full quality ring + per-metric sparklines.
+                         Same data as before, just gated by the toggle. -->
+                    <StackPanel Visibility="{Binding IsTechnicianMode, Converter={StaticResource BoolToVis}}">
                     <!-- Quality ring dashboard -->
                     <ctrl:QualityRingControl Width="240" Height="240" HorizontalAlignment="Center"
                                              OverallScore="{Binding OverallScore}"
@@ -247,7 +283,12 @@
                                                MinValue="0" MaxValue="400"
                                                LineBrush="#F472B6"/>
                     </Grid>
+                    </StackPanel>
+                    <!-- end of Techniker-Modus block -->
 
+                    <!-- Issue card (visible in BOTH modes when something's wrong;
+                         the simple-mode hero already echoes the body but the
+                         dedicated card is more glance-able). -->
                     <Border Background="{DynamicResource SystemFillColorCautionBackgroundBrush}"
                             CornerRadius="8" Padding="12,10" Margin="0,0,0,16"
                             Visibility="{Binding HasIssues, Converter={StaticResource BoolToVis}}">

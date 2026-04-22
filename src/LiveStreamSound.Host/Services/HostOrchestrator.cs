@@ -25,8 +25,16 @@ public sealed class HostOrchestrator : IAsyncDisposable
     public AudioPipelineState Pipeline { get; }
     public IdleClientDiscoveryService IdleClientDiscovery { get; }
     public InviteClientService InviteClient { get; }
+    public HostMonitorMuteService MonitorMute { get; }
 
     public string? LocalIp { get; private set; }
+
+    /// <summary>
+    /// When true, the host's default playback device is muted on
+    /// <see cref="StartSession"/> and restored on <see cref="StopSessionAsync"/>.
+    /// Stream to clients is unaffected (loopback runs pre-mute).
+    /// </summary>
+    public bool AutoMuteHostMonitor { get; set; } = true;
 
     public HostOrchestrator()
     {
@@ -41,6 +49,7 @@ public sealed class HostOrchestrator : IAsyncDisposable
         Diagnostics = new DiagnosticsService(Sessions, Pipeline, Log);
         IdleClientDiscovery = new IdleClientDiscoveryService(Log);
         InviteClient = new InviteClientService(Log);
+        MonitorMute = new HostMonitorMuteService(Log);
 
         Capture.FrameAvailable += OnPcmFrame;
         Capture.CaptureError += ex => Log.Error("Capture", "Recording error", ex);
@@ -76,6 +85,16 @@ public sealed class HostOrchestrator : IAsyncDisposable
                 sessionName: sessionName ?? Environment.MachineName);
             Capture.Start();
             started++;
+            // Auto-start idle-client discovery so the dashboard can show
+            // "client X is waiting for an invitation" toasts as soon as a
+            // session is live. Idempotent — safe even if the invite dialog
+            // also calls Start() later.
+            try { IdleClientDiscovery.Start(); } catch { /* non-fatal */ }
+            // Optionally mute the host's own speakers — common Matura case
+            // where teacher's laptop is in the same room as the beamer
+            // speakers and double-audio is distracting. Stream is unaffected
+            // because loopback reads pre-mute.
+            if (AutoMuteHostMonitor) MonitorMute.Mute();
             // Session code is NOT logged to file — it's a short-lived secret.
             Log.Info("Orchestrator", $"Session ready. Clients: {LocalIp}:{Control.Port}, audio {AudioServer.Port}");
             return code;
@@ -112,6 +131,8 @@ public sealed class HostOrchestrator : IAsyncDisposable
         await Control.DisposeAsync();
         AudioServer.Dispose();
         Sessions.StopSession();
+        // Restore host's pre-session mute state (no-op if we never muted).
+        MonitorMute.Restore();
         Log.Info("Orchestrator", "Session stopped");
     }
 
@@ -167,6 +188,7 @@ public sealed class HostOrchestrator : IAsyncDisposable
         Capture.Dispose();
         Diagnostics.Dispose();
         Sessions.Dispose();
+        MonitorMute.Dispose();
         Log.Dispose();
     }
 }

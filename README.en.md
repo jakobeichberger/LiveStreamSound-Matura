@@ -23,6 +23,9 @@ Same `.exe`. The role can be switched at runtime via the burger menu.
 - 🔒 6-digit session code, no passwords
 - 🔍 Auto discovery via mDNS + manual IP fallback
 - 📨 **Host can actively invite clients** (client confirms with accept/reject prompt) — teacher doesn't have to walk to each room PC
+- ✨ **Idle-client toasts** on the host dashboard: waiting room PCs appear bottom-right as animated cards with a "+" button — no dialog navigation needed
+- 👨‍🏫 **Teacher mode / Technician mode** on the client dashboard: default view is a single pulsing heartbeat + plain-language status, technician mode reveals sparklines and full metrics
+- 🔇 **Auto-mute on host**: the teacher's laptop speakers are muted while the session runs (stream to clients continues), the previous state is restored on stop
 - ⏱️ Synchronous playback on all clients (timestamp-based jitter buffer, NTP-like clock sync)
 - 🎚️ Per-client remote control: volume, mute, output device, kick
 - 🏷️ Auto room detection from hostname (`HP-KB-017` → "Room 017"), categorized as classroom / workshop / other

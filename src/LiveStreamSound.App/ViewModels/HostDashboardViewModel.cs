@@ -33,10 +33,24 @@ public partial class HostDashboardViewModel : ObservableObject
     [ObservableProperty] private string _startupErrorBody = "";
     [ObservableProperty] private bool _hasStartupError;
     [ObservableProperty] private string _formattedSessionCode = "";
+    /// <summary>
+    /// Persisted toggle: when true, the host mutes its own speakers on session
+    /// start so the teacher's laptop doesn't double-up with the beamer audio.
+    /// </summary>
+    [ObservableProperty] private bool _autoMuteHostMonitor;
 
     public ObservableCollection<ClientGroupViewModel> ClientGroups { get; } = new();
     public ObservableCollection<LogEntry> LogEntries { get; } = new();
+    /// <summary>Animated toasts in the bottom-right corner: idle clients on the LAN
+    /// that the teacher can add with one click.</summary>
+    public ObservableCollection<IdleClientNotificationViewModel> IdleClientNotifications { get; } = new();
     public Loc Localization => Loc.Instance;
+
+    // Track instance names the user has explicitly dismissed; suppress that
+    // exact instance for ResuppressionWindow before showing it again.
+    private readonly Dictionary<string, DateTimeOffset> _dismissedAt = new();
+    private readonly TimeSpan _resuppressionWindow = TimeSpan.FromSeconds(60);
+    private const int MaxVisibleNotifications = 3;
 
     public HostDashboardViewModel()
     {
@@ -44,6 +58,10 @@ public partial class HostDashboardViewModel : ObservableObject
             ?? throw new InvalidOperationException("HostDashboardViewModel created without active HostOrchestrator");
         _dispatcher = Dispatcher.CurrentDispatcher;
         IsDarkTheme = ApplicationThemeManager.GetAppTheme() == ApplicationTheme.Dark;
+
+        // Restore persisted host-mute preference + propagate to orchestrator.
+        AutoMuteHostMonitor = AppShell.Current.Settings.Current.HostAutoMuteOnSessionStart;
+        _orchestrator.AutoMuteHostMonitor = AutoMuteHostMonitor;
 
         foreach (LaptopCategory cat in Enum.GetValues<LaptopCategory>())
             _groups[cat] = new ClientGroupViewModel(cat);
@@ -53,6 +71,7 @@ public partial class HostDashboardViewModel : ObservableObject
         _orchestrator.Sessions.ClientReconnecting += OnClientReconnecting;
         _orchestrator.Sessions.ClientRejoined += OnClientRejoined;
         _orchestrator.Sessions.SessionStateChanged += OnSessionStateChangedHandler;
+        _orchestrator.IdleClientDiscovery.ClientsChanged += OnIdleClientsChanged;
         _orchestrator.Diagnostics.ClientQualityUpdated += OnClientQualityUpdated;
         _orchestrator.Control.ClientStatusReceived += OnClientStatusHandler;
         _orchestrator.Log.EntryAdded += OnLogEntryHandler;
@@ -124,6 +143,60 @@ public partial class HostDashboardViewModel : ObservableObject
     /// <summary>Rejoin completed — same ClientId, fresh ConnectedClient. Rebind the tile.</summary>
     private void OnClientRejoined(ConnectedClient c) =>
         _dispatcher.Invoke(() => FindVm(c.ClientId)?.Rebind(c));
+
+    /// <summary>
+    /// mDNS browser saw the idle-client list change. Reconcile the toast list:
+    /// add cards for newly-seen idle clients, remove ones that vanished or
+    /// already joined (tile exists), and skip recently-dismissed instances.
+    /// </summary>
+    private void OnIdleClientsChanged(IReadOnlyList<DiscoveredIdleClient> idle) =>
+        _dispatcher.BeginInvoke(() =>
+        {
+            // Drop expired dismissals so they can re-surface naturally.
+            var cutoff = DateTimeOffset.UtcNow - _resuppressionWindow;
+            foreach (var key in _dismissedAt.Where(kv => kv.Value < cutoff).Select(kv => kv.Key).ToList())
+                _dismissedAt.Remove(key);
+
+            // Build the desired notification set: idle clients that are
+            // (a) not already represented as a tile in any client group, and
+            // (b) not currently dismissed within the resuppression window.
+            var connectedNames = ClientGroups
+                .SelectMany(g => g.Clients)
+                .Select(t => t.RawHostname.Trim().ToLowerInvariant())
+                .ToHashSet();
+
+            var desired = idle
+                .Where(c => !_dismissedAt.ContainsKey(c.InstanceName))
+                .Where(c =>
+                {
+                    var name = (c.FriendlyName ?? c.InstanceName).Trim().ToLowerInvariant();
+                    return !connectedNames.Contains(name);
+                })
+                .Take(MaxVisibleNotifications)
+                .ToList();
+
+            // Reconcile: remove ones not in `desired`, add new ones.
+            var desiredKeys = desired.Select(c => c.InstanceName).ToHashSet();
+            var stale = IdleClientNotifications
+                .Where(n => !desiredKeys.Contains(n.InstanceName))
+                .ToList();
+            foreach (var s in stale) IdleClientNotifications.Remove(s);
+
+            foreach (var c in desired)
+            {
+                if (IdleClientNotifications.All(n => n.InstanceName != c.InstanceName))
+                {
+                    IdleClientNotifications.Add(new IdleClientNotificationViewModel(
+                        c, _orchestrator, DismissNotification));
+                }
+            }
+        });
+
+    private void DismissNotification(IdleClientNotificationViewModel vm)
+    {
+        _dismissedAt[vm.InstanceName] = DateTimeOffset.UtcNow;
+        IdleClientNotifications.Remove(vm);
+    }
 
     private void OnClientQualityUpdated(ConnectedClient c) =>
         _dispatcher.Invoke(() => FindVm(c.ClientId)?.UpdateFromModel());
@@ -200,6 +273,20 @@ public partial class HostDashboardViewModel : ObservableObject
 
     [RelayCommand] private void ToggleHelp() => IsHelpOpen = !IsHelpOpen;
     [RelayCommand] private void ToggleLog() => IsLogOpen = !IsLogOpen;
+
+    partial void OnAutoMuteHostMonitorChanged(bool value)
+    {
+        _orchestrator.AutoMuteHostMonitor = value;
+        AppShell.Current.Settings.Current.HostAutoMuteOnSessionStart = value;
+        AppShell.Current.Settings.Save();
+        // If a session is already running, apply the change live so the
+        // teacher gets immediate feedback from the toggle.
+        if (_orchestrator.Sessions.IsActive)
+        {
+            if (value) _orchestrator.MonitorMute.Mute();
+            else _orchestrator.MonitorMute.Restore();
+        }
+    }
 
     [RelayCommand]
     private void CloseSidePanels()
