@@ -96,6 +96,12 @@ public sealed class ControlClient : IAsyncDisposable
                     if (salt is null || mac is null || salt.Length < 8)
                     {
                         SetState(ControlClientState.Failed);
+                        _log.Warn("ControlClient",
+                            $"WELCOME from {host}:{controlPort} is malformed: " +
+                            $"saltHex='{welcome.SessionSaltHex ?? "(null)"}' " +
+                            $"macHex='{welcome.WelcomeMacHex ?? "(null)"}' — " +
+                            $"likely an older host without protocol-v2 AEAD support, " +
+                            $"or a corrupted message.");
                         ConnectionError?.Invoke("AUTH_FAIL:WELCOME_MALFORMED");
                         return null;
                     }
@@ -109,7 +115,10 @@ public sealed class ControlClient : IAsyncDisposable
                         SetState(ControlClientState.Failed);
                         ConnectionError?.Invoke("AUTH_FAIL:WELCOME_MAC_INVALID");
                         _log.Warn("ControlClient",
-                            $"Rejected WELCOME from {host}:{controlPort} — MAC invalid (host doesn't know session code)");
+                            $"Rejected WELCOME from {host}:{controlPort} — MAC invalid " +
+                            $"(host doesn't know session code, or fake host on LAN). " +
+                            $"clientId='{welcome.ClientId}' canonicalLen={canonical.Length} " +
+                            $"saltLen={salt.Length} macLen={mac.Length}");
                         return null;
                     }
 
@@ -130,12 +139,34 @@ public sealed class ControlClient : IAsyncDisposable
 
                 case AuthFail fail:
                     SetState(ControlClientState.Failed);
+                    _log.Warn("ControlClient",
+                        $"Host {host}:{controlPort} rejected our HELLO with AuthFail: '{fail.Reason}'");
                     ConnectionError?.Invoke($"AUTH_FAIL:{fail.Reason}");
+                    return null;
+
+                case null:
+                    // Server closed the TCP without sending a response. Most
+                    // likely causes (in order of frequency seen in the wild):
+                    //   1. Host threw an exception while building Welcome —
+                    //      check the host's log for "handler failed".
+                    //   2. Pre-HELLO 5-second timeout on host fired (HELLO
+                    //      didn't make it through firewall / NIC).
+                    //   3. Host listener was Stopped during our handshake.
+                    SetState(ControlClientState.Failed);
+                    _log.Warn("ControlClient",
+                        $"Host {host}:{controlPort} closed connection without responding " +
+                        $"to our HELLO (EOF mid-handshake). Check the host log for a " +
+                        $"matching 'handler failed' or 'expected HELLO' entry.");
+                    ConnectionError?.Invoke("AUTH_FAIL:HOST_CLOSED_PREMATURELY");
                     return null;
 
                 default:
                     SetState(ControlClientState.Failed);
-                    ConnectionError?.Invoke("UNEXPECTED_RESPONSE");
+                    _log.Warn("ControlClient",
+                        $"Host {host}:{controlPort} returned an unexpected first message of " +
+                        $"type '{response.GetType().Name}' (expected Welcome or AuthFail). " +
+                        $"Likely a protocol-version mismatch or wrong host (e.g. mDNS spoof).");
+                    ConnectionError?.Invoke($"UNEXPECTED_RESPONSE:{response.GetType().Name}");
                     return null;
             }
         }
