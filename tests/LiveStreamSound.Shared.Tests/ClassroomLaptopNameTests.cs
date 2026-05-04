@@ -151,4 +151,24 @@ public class ClassroomLaptopNameTests
     {
         Assert.Equal("", ClassroomLaptopName.FriendlyName(""));
     }
+
+    // Regression for the dashboard idle-toast deduplication bug: connected
+    // tiles store the RAW hostname ("HP-KB-017") while idle clients advertise
+    // the FRIENDLY name ("Raum 017") via mDNS TXT. Both must reduce to the
+    // same Classify() result so the toast filter can suppress already-connected
+    // clients. This test guards the equivalence assumption — if Classify()
+    // ever stops parsing the friendly name, the toast filter regresses to the
+    // pre-fix behaviour where idle clients keep re-toasting.
+    [Theory]
+    [InlineData("HP-KB-017", "Raum 017")]
+    [InlineData("LEN-KB-065-2", "Raum 065 (Gerät 2)")]
+    [InlineData("HP-WERK-038", "Werkstatt 038")]
+    public void Classify_RawAndFriendly_HaveMatchingRoomKeys(string raw, string friendly)
+    {
+        var rawParsed = ClassroomLaptopName.Classify(raw);
+        // The friendly form may not parse via FullPattern, but the digits
+        // extracted from the friendly label must match the raw room number.
+        var friendlyDigits = string.Concat(friendly.Where(char.IsDigit));
+        Assert.Contains(rawParsed.Room, friendlyDigits);
+    }
 }

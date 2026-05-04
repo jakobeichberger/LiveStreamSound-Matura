@@ -234,7 +234,9 @@ public sealed class ClientOrchestrator : IAsyncDisposable
             ReconnectStatusChanged?.Invoke();
 
             // Exponential backoff w/ jitter: 500, 1000, 2000, 4000, 8000, cap 15000.
-            var baseDelay = Math.Min(500 * (int)Math.Pow(2, _reconnectAttempt - 1), 15_000);
+            // Use double + Math.Min so very high attempt counts can't overflow
+            // int (e.g. 500 * 2^31 = negative int → Task.Delay throws).
+            var baseDelay = (int)Math.Min(500.0 * Math.Pow(2, _reconnectAttempt - 1), 15_000d);
             var jitter = Random.Shared.Next(0, 400);
             var delay = baseDelay + jitter;
             Log.Info("Orchestrator",
@@ -242,21 +244,30 @@ public sealed class ClientOrchestrator : IAsyncDisposable
             try { await Task.Delay(delay, ct).ConfigureAwait(false); }
             catch (OperationCanceledException) { return; }
 
+            // Capture the last connection-error so we can distinguish AUTH_FAIL
+            // (terminal) from transient socket / network errors (retryable).
+            string? lastError = null;
+            void CaptureError(string msg) => lastError = msg;
+            Control.ConnectionError += CaptureError;
             try
             {
                 var welcome = await Control.ConnectAsync(host, port, code, name, ct).ConfigureAwait(false);
                 if (welcome is null)
                 {
-                    // Might be AUTH_FAIL — check state. If Failed + error was auth,
-                    // give up (host is running a different session code now).
-                    if (Control.State == ControlClientState.Failed)
+                    // Welcome=null happens for both AUTH_FAIL and transient
+                    // socket errors. Only the auth case is terminal — host
+                    // may be running a different session code now. Network
+                    // glitches should keep retrying.
+                    if (lastError is not null && lastError.StartsWith("AUTH_FAIL:", StringComparison.Ordinal))
                     {
                         Log.Warn("Orchestrator",
-                            $"Reconnect gave up: auth failed (host probably restarted session with a different code)");
+                            $"Reconnect gave up: {lastError} (host probably restarted session)");
                         _sessionActive = false;
                         ReconnectStatusChanged?.Invoke();
                         return;
                     }
+                    Log.Info("Orchestrator",
+                        $"Reconnect attempt #{_reconnectAttempt} → transient ({lastError ?? "unknown"}), backing off");
                     continue; // transient failure, backoff and retry
                 }
 
@@ -271,6 +282,10 @@ public sealed class ClientOrchestrator : IAsyncDisposable
             catch (Exception ex)
             {
                 Log.Warn("Orchestrator", $"Reconnect attempt #{_reconnectAttempt} failed: {ex.Message}");
+            }
+            finally
+            {
+                Control.ConnectionError -= CaptureError;
             }
         }
     }

@@ -198,7 +198,12 @@ public sealed class ControlServer : IAsyncDisposable
         }
         finally
         {
-            if (registered is not null)
+            // Only soft-unregister if THIS connection is still the one the
+            // session knows about. Otherwise we're a stale per-connection
+            // task that finally-ran after a fresh rejoin already swapped the
+            // ConnectedClient's TcpClient for a new socket — flipping back
+            // to IsReconnecting=true here would kick the rejoined client.
+            if (registered is not null && ReferenceEquals(registered.TcpClient, tcp))
                 _sessions.UnregisterClient(registered.ClientId);
             try { tcp.Dispose(); } catch { }
         }

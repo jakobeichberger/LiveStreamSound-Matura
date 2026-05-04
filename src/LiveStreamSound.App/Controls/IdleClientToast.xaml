@@ -14,6 +14,11 @@
     <UserControl.Resources>
         <conv:BoolToVisibilityConverter x:Key="BoolToVis"/>
         <conv:BoolToVisibilityConverter x:Key="BoolToVisInv" Inverted="True"/>
+        <!-- StringText: visible when non-empty / "subtitle when empty". The
+             previous version used BoolToVisibility on a string which
+             evaluated to false → status text was always Collapsed. -->
+        <conv:StringToVisibilityConverter x:Key="HasStringToVis"/>
+        <conv:StringToVisibilityConverter x:Key="EmptyStringToVis" VisibleWhenEmpty="True"/>
     </UserControl.Resources>
 
     <UserControl.RenderTransform>
@@ -27,7 +32,7 @@
 
     <UserControl.Triggers>
         <EventTrigger RoutedEvent="UserControl.Loaded">
-            <BeginStoryboard>
+            <BeginStoryboard x:Name="ToastStoryboard">
                 <Storyboard>
                     <!-- Slide-in animation -->
                     <DoubleAnimation Storyboard.TargetName="SlideTransform"
@@ -119,10 +124,10 @@
                 </StackPanel>
                 <TextBlock Margin="0,2,0,0" FontSize="11" Opacity="0.7"
                            Text="{Binding [Notification.IdleClient.Subtitle], Source={x:Static loc:Loc.Instance}}"
-                           Visibility="{Binding StatusText, Converter={StaticResource BoolToVisInv}}"/>
+                           Visibility="{Binding StatusText, Converter={StaticResource EmptyStringToVis}}"/>
                 <TextBlock Margin="0,2,0,0" FontSize="11"
                            Text="{Binding StatusText}"
-                           Visibility="{Binding StatusText, Converter={StaticResource BoolToVis}}">
+                           Visibility="{Binding StatusText, Converter={StaticResource HasStringToVis}}">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
                             <Setter Property="Opacity" Value="0.8"/>
