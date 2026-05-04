@@ -71,6 +71,11 @@ public sealed class ControlServer : IAsyncDisposable
         _acceptLoopTask = Task.Run(() => AcceptLoopAsync(_cts.Token));
     }
 
+    /// <summary>Cap on simultaneously-accepted-but-not-authenticated connections.
+    /// Defends against SlowLoris-style resource exhaustion.</summary>
+    private const int MaxConcurrentPreAuthConnections = 50;
+    private int _preAuthInFlight;
+
     private async Task AcceptLoopAsync(CancellationToken ct)
     {
         try
@@ -78,7 +83,18 @@ public sealed class ControlServer : IAsyncDisposable
             while (!ct.IsCancellationRequested)
             {
                 var tcp = await _listener!.AcceptTcpClientAsync(ct).ConfigureAwait(false);
-                _ = Task.Run(() => HandleClientAsync(tcp, ct), ct);
+                if (Interlocked.Increment(ref _preAuthInFlight) > MaxConcurrentPreAuthConnections)
+                {
+                    Interlocked.Decrement(ref _preAuthInFlight);
+                    try { tcp.Close(); } catch { }
+                    _log.Debug("ControlServer", "Rejected — too many concurrent pre-auth connections");
+                    continue;
+                }
+                _ = Task.Run(async () =>
+                {
+                    try { await HandleClientAsync(tcp, ct).ConfigureAwait(false); }
+                    finally { Interlocked.Decrement(ref _preAuthInFlight); }
+                }, ct);
             }
         }
         catch (OperationCanceledException) { }
@@ -99,55 +115,104 @@ public sealed class ControlServer : IAsyncDisposable
             // The stream is owned by the TcpClient and disposed alongside it in the finally block.
             var stream = tcp.GetStream();
 
-            var first = await MessageJson.ReadFrameAsync(stream, ct).ConfigureAwait(false);
+            // Per-connection 5-second pre-HELLO timeout so a SlowLoris peer
+            // (TCP-accept, no HELLO) can't tie up a thread-pool task forever.
+            using var helloTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            using var helloCts = CancellationTokenSource.CreateLinkedTokenSource(ct, helloTimeout.Token);
+            var first = await MessageJson.ReadFrameAsync(stream, helloCts.Token).ConfigureAwait(false);
             if (first is not Hello hello)
             {
                 _log.Warn("ControlServer", $"{remote}: expected HELLO, got {first?.GetType().Name ?? "null"}");
                 return;
             }
 
+            // Protocol-version compatibility check FIRST so a mismatched client
+            // gets a clear error instead of trying to brute-force a code with
+            // a wire format that's about to be rejected.
+            if (hello.ProtocolVersion != DiscoveryConstants.ProtocolVersion)
+            {
+                await MessageJson.WriteFrameAsync(stream, new AuthFail("PROTOCOL_VERSION_MISMATCH"), ct);
+                _log.Warn("ControlServer",
+                    $"{remote}: protocol version {hello.ProtocolVersion} != server {DiscoveryConstants.ProtocolVersion}");
+                return;
+            }
+
+            // Sanitize ClientName before any further use: cap at 64 chars,
+            // strip control characters that could break log parsing
+            // (CWE-117 log injection defense).
+            var sanitizedName = SanitizeClientName(hello.ClientName);
+
             // Rate-limit auth attempts so the 6-digit session code can't be
-            // brute-forced from the LAN (1M combinations · 1000 req/s = ~17 min).
+            // brute-forced from the LAN. Unified-error path below (no enumeration).
             if (!_auth.AllowAttempt(remote.Address))
             {
-                await MessageJson.WriteFrameAsync(stream, new AuthFail("RATE_LIMITED"), ct);
+                await MessageJson.WriteFrameAsync(stream, new AuthFail("AUTH_FAILED"), ct);
                 _log.Warn("ControlServer",
                     $"{remote}: rate-limited after {_auth.CurrentFailureCount(remote.Address)} failed attempts");
                 return;
             }
 
-            if (!_sessions.IsActive)
+            if (!_sessions.IsActive || !_sessions.ValidateCode(hello.Code))
             {
-                await MessageJson.WriteFrameAsync(stream, new AuthFail("SESSION_NOT_ACTIVE"), ct);
-                return;
-            }
-            if (!_sessions.ValidateCode(hello.Code))
-            {
-                _auth.RecordFailure(remote.Address);
-                await MessageJson.WriteFrameAsync(stream, new AuthFail("INVALID_CODE"), ct);
-                // Deliberately do NOT log the attempted code — tester pass flagged
-                // session codes leaking into rolling log files.
-                _log.Warn("ControlServer", $"{remote}: invalid code (name={hello.ClientName})");
+                if (_sessions.IsActive)
+                {
+                    _auth.RecordFailure(remote.Address);
+                    _log.Warn("ControlServer", $"{remote}: invalid code (name={sanitizedName})");
+                }
+                else
+                {
+                    // Don't increment auth-tracker for "no session" — but also
+                    // return the same opaque error so attackers can't enumerate
+                    // session-active vs wrong-code by response timing/text.
+                    _log.Info("ControlServer", $"{remote}: hello while no session active");
+                }
+                // Small artificial delay defends against rapid IP-rotation
+                // brute-force: legit users won't notice 100ms, attackers
+                // grinding 75k attempts/hour drop ~10×.
+                await Task.Delay(TimeSpan.FromMilliseconds(120), ct);
+                await MessageJson.WriteFrameAsync(stream, new AuthFail("AUTH_FAILED"), ct);
                 return;
             }
             _auth.RecordSuccess(remote.Address);
 
-            var effectiveName = string.IsNullOrWhiteSpace(hello.ClientName)
+            var effectiveName = string.IsNullOrWhiteSpace(sanitizedName)
                 ? $"Client-{Guid.NewGuid().ToString("N")[..8]}"
-                : hello.ClientName;
+                : sanitizedName;
 
             // First check if this is a rejoining client (same name, TCP
             // dropped within the grace period). If so, reuse the old
             // ClientId + preserved volume/mute/device settings so the teacher
             // doesn't lose any per-client config across a WLAN hiccup.
+            //
+            // SECURITY: rejoin requires the source IP to match the original
+            // connect — otherwise a same-name attacker on a different machine
+            // could "inherit" a legitimate client's slot during the 60s grace
+            // window and silently receive the stream. Identical source IP
+            // doesn't prove identity strongly, but raises the bar from
+            // "anyone on LAN" to "co-tenant of the same NAT/IP" which on a
+            // school LAN is a meaningful restriction.
             var existing = _sessions.TryFindReconnectingByName(effectiveName);
-            if (existing is not null)
+            if (existing is not null && existing.TcpEndpoint.Address.Equals(remote.Address))
             {
                 existing.TcpClient = tcp;
                 existing.TcpEndpoint = remote;
                 existing.WriteLock = new SemaphoreSlim(1, 1);
                 _sessions.FinalizeRejoin(existing);
                 registered = existing;
+            }
+            else if (existing is not null)
+            {
+                _log.Warn("ControlServer",
+                    $"{remote}: rejoin name match for {effectiveName} but source IP differs " +
+                    $"({existing.TcpEndpoint.Address} → {remote.Address}); treating as new client");
+                var clientId = Guid.NewGuid().ToString("N")[..12];
+                registered = _sessions.RegisterClient(new ConnectedClient
+                {
+                    ClientId = clientId,
+                    ClientName = effectiveName,
+                    TcpClient = tcp,
+                    TcpEndpoint = remote,
+                });
             }
             else
             {
@@ -161,13 +226,24 @@ public sealed class ControlServer : IAsyncDisposable
                 });
             }
 
+            var serverTimeMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            var saltHex = _sessions.SessionSaltHex;
+            var crypto = _sessions.Crypto
+                ?? throw new InvalidOperationException("Crypto not initialised after StartSession");
+            var canonical = SessionCrypto.CanonicalWelcomeBytes(
+                registered.ClientId, AudioPort, AudioFormat.SampleRate,
+                AudioFormat.Channels, "opus", serverTimeMs, saltHex);
+            var welcomeMacHex = SessionCrypto.ToHex(crypto.Mac(canonical));
+
             var welcome = new Welcome(
                 ClientId: registered.ClientId,
                 AudioUdpPort: AudioPort,
                 SampleRate: AudioFormat.SampleRate,
                 Channels: AudioFormat.Channels,
                 AudioCodec: "opus",
-                ServerTimeMs: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+                ServerTimeMs: serverTimeMs,
+                SessionSaltHex: saltHex,
+                WelcomeMacHex: welcomeMacHex);
             await SendOnStreamAsync(registered, stream, welcome, ct);
 
             // For a rejoin: push the preserved volume/mute/device back down so
@@ -276,6 +352,30 @@ public sealed class ControlServer : IAsyncDisposable
     {
         foreach (var c in _sessions.Clients)
             await SendAsync(c, message, ct);
+    }
+
+    /// <summary>
+    /// Truncate + control-character-strip an attacker-controlled ClientName so
+    /// it can't inject newlines / log-format-breaking sequences and so a
+    /// 1-MiB malicious value doesn't propagate through ToLowerInvariant /
+    /// dictionary lookups. Defense for CWE-117 (log injection) and DoS via
+    /// large name strings.
+    /// </summary>
+    private static string SanitizeClientName(string raw)
+    {
+        if (string.IsNullOrEmpty(raw)) return "";
+        const int maxLen = 64;
+        var trimmed = raw.Length > maxLen ? raw[..maxLen] : raw;
+        var sb = new System.Text.StringBuilder(trimmed.Length);
+        foreach (var c in trimmed)
+        {
+            // Allow printable ASCII + common Unicode letters; reject control
+            // chars (newline, tab, escape sequences) which would break log
+            // line semantics.
+            if (c == '\r' || c == '\n' || c == '\t' || char.IsControl(c)) continue;
+            sb.Append(c);
+        }
+        return sb.ToString().Trim();
     }
 
     public async ValueTask DisposeAsync()

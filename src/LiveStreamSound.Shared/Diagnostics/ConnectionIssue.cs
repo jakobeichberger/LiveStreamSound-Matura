@@ -37,6 +37,13 @@ public enum ConnectionIssue
 
     /// <summary>Client hasn't reported status in too long.</summary>
     ClientNotResponding,
+
+    /// <summary>System clock is wildly off (e.g. CMOS battery dead, just-booted with default 2010 date).
+    /// Audio sync falls back to no-offset mode but timing is degraded.</summary>
+    SystemClockSuspect,
+
+    /// <summary>Host and client built from different protocol versions — wire incompatible.</summary>
+    ProtocolVersionMismatch,
 }
 
 public enum QualityLevel

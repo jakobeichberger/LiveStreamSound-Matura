@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using LiveStreamSound.Shared.Discovery;
 using LiveStreamSound.Shared.Protocol;
+using SharedCrypto = LiveStreamSound.Shared.Protocol.SessionCrypto;
 
 namespace LiveStreamSound.Host.Services;
 
@@ -59,36 +60,58 @@ public sealed class AudioStreamServer : IDisposable
         CancellationToken ct = default)
     {
         if (_udp is null) return;
+        var crypto = _sessions.Crypto;
+        if (crypto is null) return; // session ended mid-broadcast — drop frame
         var seq = Interlocked.Increment(ref _sequence);
-        var totalLen = AudioPacket.HeaderSize + encodedPayload.Length;
 
-        // ArrayPool-rented buffer keeps the 50 fps broadcast pipeline off the GC.
+        // AEAD-encrypted payload layout on the wire:
+        //   [original AudioPacket header (20 bytes, version=1, magic=LSSA)]
+        //   [ciphertext (= plaintext length)]
+        //   [16-byte AES-GCM auth tag]
+        // Header.PayloadLength reflects ciphertext length so a v1 client
+        // (rejected at HELLO with PROTOCOL_VERSION_MISMATCH anyway) sees
+        // a structurally valid packet but garbage Opus.
+        var plaintextLen = encodedPayload.Length;
+        var totalLen = AudioPacket.HeaderSize + plaintextLen + SessionCrypto.TagSizeBytes;
         var packet = ArrayPool<byte>.Shared.Rent(totalLen);
         try
         {
-            AudioPacket.Write(packet.AsSpan(0, totalLen),
-                new AudioPacketHeader(seq, serverTimestampMs, payloadType, (ushort)encodedPayload.Length),
+            // Write the header first with the meaningful payload length
+            // (ciphertext length, NOT including the tag — we put the tag after).
+            AudioPacket.Write(packet.AsSpan(0, AudioPacket.HeaderSize + plaintextLen),
+                new AudioPacketHeader(seq, serverTimestampMs, payloadType, (ushort)plaintextLen),
                 encodedPayload.Span);
 
-            // ActiveClients skips clients whose TCP just dropped (currently in
-            // grace period) so we don't waste bandwidth spraying UDP at an
-            // endpoint whose owner isn't listening.
-            foreach (var client in _sessions.ActiveClients)
-            {
-                if (client.AudioEndpoint is null) continue;
-                try
-                {
-                    await _udp.SendAsync(packet, totalLen, client.AudioEndpoint).ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    _log.Warn("AudioStreamServer", $"UDP send to {client.ClientId} failed", ex);
-                }
-            }
+            // Encrypt in-place over the just-written plaintext slice.
+            var ciphertextSpan = packet.AsSpan(AudioPacket.HeaderSize, plaintextLen);
+            var tagSpan = packet.AsSpan(AudioPacket.HeaderSize + plaintextLen, SessionCrypto.TagSizeBytes);
+            crypto.EncryptAudio(seq, encodedPayload.Span, ciphertextSpan, tagSpan);
+
+            var udp = _udp;
+            var sendTasks = _sessions.ActiveClients
+                .Where(c => c.AudioEndpoint is not null)
+                .Select(c => SendOneAsync(udp, packet, totalLen, c))
+                .ToArray();
+            await Task.WhenAll(sendTasks).ConfigureAwait(false);
         }
         finally
         {
             ArrayPool<byte>.Shared.Return(packet);
+        }
+    }
+
+    private async Task SendOneAsync(UdpClient udp, byte[] packet, int len, ConnectedClient client)
+    {
+        try
+        {
+            await udp.SendAsync(packet, len, client.AudioEndpoint!).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            // Log per-client failures at Debug — at 50 fps a transiently-bad
+            // NIC would otherwise spam the log. The diagnostics service will
+            // surface persistent loss separately as a connection issue.
+            _log.Debug("AudioStreamServer", $"UDP send to {client.ClientId} failed: {ex.Message}");
         }
     }
 

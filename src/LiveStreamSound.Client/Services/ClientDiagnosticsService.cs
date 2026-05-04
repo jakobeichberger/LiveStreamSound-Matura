@@ -12,7 +12,8 @@ public sealed class ClientDiagnosticsService : IDisposable
     private readonly AudioStreamClient _audio;
     private readonly SyncBuffer _buffer;
     private readonly ClockSyncService _clockSync;
-    private readonly Timer _timer;
+    private readonly CancellationTokenSource _cts = new();
+    private readonly Task _tickTask;
     public ConnectionQuality Current { get; private set; } =
         new(0, 0, 0, 0, Array.Empty<ConnectionIssue>(), QualityLevel.Disconnected);
     public event Action<ConnectionQuality>? QualityChanged;
@@ -32,7 +33,22 @@ public sealed class ClientDiagnosticsService : IDisposable
         _audio = audio;
         _buffer = buffer;
         _clockSync = clockSync;
-        _timer = new Timer(_ => Tick(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        // PeriodicTimer + serial loop — Tick() can never re-enter itself.
+        _tickTask = Task.Run(() => RunTickLoopAsync(_cts.Token));
+    }
+
+    private async Task RunTickLoopAsync(CancellationToken ct)
+    {
+        using var t = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        try
+        {
+            while (await t.WaitForNextTickAsync(ct).ConfigureAwait(false))
+            {
+                try { Tick(); }
+                catch { /* never throw from a Tick */ }
+            }
+        }
+        catch (OperationCanceledException) { }
     }
 
     private void Tick()
@@ -79,6 +95,11 @@ public sealed class ClientDiagnosticsService : IDisposable
             !issues.Contains(ConnectionIssue.FirewallUdpBlocked))
             issues.Add(ConnectionIssue.NoAudioStreamOnHost);
 
+        // Surface system-clock weirdness as a UI hint — sync is degraded but
+        // audio still plays in arrival-order, so it's a "yellow" issue.
+        if (_clockSync.ClockSuspect)
+            issues.Add(ConnectionIssue.SystemClockSuspect);
+
         var level = Classify(_control.State, issues);
         var q = new ConnectionQuality(rtt, lossPct, 0, _buffer.CurrentBufferedMs, issues, level);
         Current = q;
@@ -96,5 +117,10 @@ public sealed class ClientDiagnosticsService : IDisposable
         return QualityLevel.Good;
     }
 
-    public void Dispose() => _timer.Dispose();
+    public void Dispose()
+    {
+        try { _cts.Cancel(); } catch { }
+        try { _tickTask.Wait(TimeSpan.FromSeconds(2)); } catch { }
+        _cts.Dispose();
+    }
 }

@@ -26,6 +26,11 @@ Same `.exe`. The role can be switched at runtime via the burger menu.
 - ✨ **Idle-client toasts** on the host dashboard: waiting room PCs appear bottom-right as animated cards with a "+" button — no dialog navigation needed
 - 👨‍🏫 **Teacher mode / Technician mode** on the client dashboard: default view is a single pulsing heartbeat + plain-language status, technician mode reveals sparklines and full metrics
 - 🔇 **Auto-mute on host**: the teacher's laptop speakers are muted while the session runs (stream to clients continues), the previous state is restored on stop
+- 🔐 **AES-256-GCM-encrypted audio stream + HMAC-authenticated Welcome** (protocol v2): Wireshark captures are useless, fake hosts are rejected by clients
+- 🎵 **Pre-flight test tone**: 10-second sine reference for verifying every room before launching the real audio
+- 📦 **Diagnostics-bundle button**: one click → ZIP with all logs + system info on the Desktop, ready to email
+- 🛡️ **Self-healing reconnect with 5-minute grace** (survives the fire-alarm scenario), sleep-suppression during active sessions
+- ⏰ **Clock-sanity guard**: detects dead-CMOS-battery clocks (year 2010) and warns instead of failing silently
 - ⏱️ Synchronous playback on all clients (timestamp-based jitter buffer, NTP-like clock sync)
 - 🎚️ Per-client remote control: volume, mute, output device, kick
 - 🏷️ Auto room detection from hostname (`HP-KB-017` → "Room 017"), categorized as classroom / workshop / other

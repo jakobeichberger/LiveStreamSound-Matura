@@ -40,6 +40,7 @@
       <ComponentGroupRef Id="DesktopShortcuts" />
       <ComponentGroupRef Id="AppFirewall" />
       <ComponentGroupRef Id="AppEventLog" />
+      <ComponentGroupRef Id="AppWerLocalDumps" />
     </Feature>
 
     <StandardDirectory Id="ProgramFiles64Folder">
@@ -136,6 +137,26 @@
         <util:EventSource Name="LiveStreamSound"
                           Log="LiveStreamSound"
                           EventMessageFile="[SystemFolder]EventCreate.exe" />
+      </Component>
+    </ComponentGroup>
+
+    <!--
+      Windows Error Reporting per-process configuration: tells WER to capture
+      a full minidump on native crashes (e.g. NAudio COM exceptions, WPF
+      render-thread crashes) into %LOCALAPPDATA%\LiveStreamSound\crashes\dumps.
+      Managed-side handlers in App.xaml.cs already cover .NET exceptions; this
+      catches the rest. Cleanup via ForceDeleteOnUninstall on the parent key.
+    -->
+    <ComponentGroup Id="AppWerLocalDumps" Directory="INSTALLFOLDER">
+      <Component Id="AppWerLocalDumpsKey" Guid="7E4D2F11-19B8-4F9F-9A0D-33B1C2F1B306">
+        <RegistryKey Root="HKLM"
+                     Key="Software\Microsoft\Windows\Windows Error Reporting\LocalDumps\LiveStreamSound.exe"
+                     ForceDeleteOnUninstall="yes">
+          <RegistryValue Name="DumpType" Type="integer" Value="2" KeyPath="yes" />
+          <RegistryValue Name="DumpCount" Type="integer" Value="5" />
+          <RegistryValue Name="DumpFolder" Type="expandable"
+                         Value="%LOCALAPPDATA%\LiveStreamSound\crashes\dumps" />
+        </RegistryKey>
       </Component>
     </ComponentGroup>
 

@@ -96,6 +96,12 @@ public sealed class IdleListenerService : IAsyncDisposable
         _log.Info("IdleListener", "Stopped");
     }
 
+    /// <summary>Cap on simultaneously-accepted-but-not-yet-handled invitations.
+    /// Defends against a SlowLoris-style attack where a malicious peer opens
+    /// many TCP sockets but never sends an Invitation frame.</summary>
+    private const int MaxConcurrentInvitations = 16;
+    private int _inFlightInvitations;
+
     private async Task AcceptLoopAsync(CancellationToken ct)
     {
         try
@@ -103,7 +109,22 @@ public sealed class IdleListenerService : IAsyncDisposable
             while (!ct.IsCancellationRequested && _listener is not null)
             {
                 var tcp = await _listener.AcceptTcpClientAsync(ct).ConfigureAwait(false);
-                _ = Task.Run(() => HandleInvitationAsync(tcp, ct), ct);
+
+                // Reject new connections beyond the in-flight cap so an
+                // adversary can't exhaust thread-pool tasks via half-open sockets.
+                if (Interlocked.Increment(ref _inFlightInvitations) > MaxConcurrentInvitations)
+                {
+                    Interlocked.Decrement(ref _inFlightInvitations);
+                    try { tcp.Close(); } catch { }
+                    _log.Debug("IdleListener", "Rejected — too many concurrent invitations");
+                    continue;
+                }
+
+                _ = Task.Run(async () =>
+                {
+                    try { await HandleInvitationAsync(tcp, ct).ConfigureAwait(false); }
+                    finally { Interlocked.Decrement(ref _inFlightInvitations); }
+                }, ct);
             }
         }
         catch (OperationCanceledException) { }
@@ -122,11 +143,36 @@ public sealed class IdleListenerService : IAsyncDisposable
             using (tcp)
             {
                 tcp.NoDelay = true;
+                tcp.ReceiveTimeout = 5000;
                 var stream = tcp.GetStream();
-                var msg = await MessageJson.ReadFrameAsync(stream, ct).ConfigureAwait(false);
+                // Bound the read with a 5-second timeout so a peer that
+                // accepts the TCP but never sends a frame can't hold the
+                // handler open forever. Combined with the in-flight cap above,
+                // this caps total resource exposure to ~16 × 5 sec = 80 sec
+                // worst case before all slots free up.
+                using var readTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, readTimeout.Token);
+                var msg = await MessageJson.ReadFrameAsync(stream, linked.Token).ConfigureAwait(false);
                 if (msg is not Invitation inv)
                 {
                     _log.Debug("IdleListener", $"{remote}: expected Invitation, got {msg?.GetType().Name ?? "null"}");
+                    return;
+                }
+
+                // Sanity-bound the attacker-controlled fields BEFORE they go
+                // into the UI dialog or any logging. Caps prevent a 1-MiB
+                // HostDisplayName from hanging the UI on TextBlock layout, and
+                // strip control characters that could break log parsing.
+                inv = SanitizeInvitation(inv);
+
+                if (!IsValidIPv4OrV6(inv.HostAddress))
+                {
+                    _log.Debug("IdleListener", $"{remote}: rejected — invalid HostAddress");
+                    return;
+                }
+                if (inv.HostControlPort is < 1 or > 65535)
+                {
+                    _log.Debug("IdleListener", $"{remote}: rejected — bad HostControlPort {inv.HostControlPort}");
                     return;
                 }
 
@@ -159,6 +205,7 @@ public sealed class IdleListenerService : IAsyncDisposable
             }
         }
         catch (IOException) { }
+        catch (OperationCanceledException) { /* read-timeout — silent drop, attacker shouldn't get a log line */ }
         catch (Exception ex)
         {
             _log.Warn("IdleListener", $"Invitation handler from {remote} failed", ex);
@@ -166,4 +213,33 @@ public sealed class IdleListenerService : IAsyncDisposable
     }
 
     public async ValueTask DisposeAsync() => await StopAsync().ConfigureAwait(false);
+
+    /// <summary>Cap attacker-controlled invitation fields. CWE-117 / CWE-1284 defense.</summary>
+    private static Invitation SanitizeInvitation(Invitation inv)
+    {
+        return new Invitation(
+            SessionCode: Trunc(inv.SessionCode, 12),
+            HostAddress: Trunc(inv.HostAddress, 64),
+            HostControlPort: inv.HostControlPort,
+            HostDisplayName: SanitizeForUi(inv.HostDisplayName, 80));
+    }
+
+    private static string Trunc(string s, int max) =>
+        string.IsNullOrEmpty(s) ? "" : (s.Length <= max ? s : s[..max]);
+
+    private static string SanitizeForUi(string s, int max)
+    {
+        if (string.IsNullOrEmpty(s)) return "";
+        var truncated = s.Length <= max ? s : s[..max];
+        var sb = new System.Text.StringBuilder(truncated.Length);
+        foreach (var c in truncated)
+        {
+            if (c == '\r' || c == '\n' || c == '\t' || char.IsControl(c)) continue;
+            sb.Append(c);
+        }
+        return sb.ToString().Trim();
+    }
+
+    private static bool IsValidIPv4OrV6(string s) =>
+        !string.IsNullOrEmpty(s) && System.Net.IPAddress.TryParse(s, out _);
 }

@@ -1,0 +1,53 @@
+LiveStreamSound-Matura — School / Private Use License
+=======================================================
+
+Copyright (c) 2026 Jakob Eichberger
+<jakob@eichberger.tech>
+https://github.com/jakobeichberger/LiveStreamSound-Matura
+
+This software was developed as a Matura (Austrian high-school final exam)
+project. It is provided to schools, teachers, and individual users for
+non-commercial educational use, free of charge, under the following terms:
+
+1. PERMITTED USE
+   You may install, run, modify, and distribute this software within your
+   educational institution at no cost, including across multiple sites and
+   devices, for the purpose of conducting school examinations and similar
+   educational activities.
+
+2. SOURCE AVAILABILITY
+   The source code is available at the GitHub URL above. Modifications you
+   make to it for your local deployment do not have to be contributed back,
+   but pull requests are welcome.
+
+3. NO WARRANTY
+   The software is provided "as is", without warranty of any kind, express
+   or implied, including but not limited to the warranties of merchantability,
+   fitness for a particular purpose, and non-infringement. In no event shall
+   the author be liable for any claim, damages, or other liability arising
+   from the use of the software, including but not limited to failed or
+   disrupted examinations.
+
+4. THIRD-PARTY COMPONENTS
+   This software incorporates the following open-source libraries, used under
+   their respective licenses. Full license texts are reproduced in
+   THIRD_PARTY_LICENSES.txt and shipped alongside this software:
+
+   - NAudio (Microsoft Public License / MS-PL)
+   - Concentus (BSD-3-Clause)
+   - WPF-UI (MIT)
+   - Makaretu.Dns.Multicast (MIT)
+   - CommunityToolkit.Mvvm (MIT)
+
+5. COMMERCIAL USE
+   Commercial redistribution of this software, or use as a service for which
+   end users are charged, is not authorized under this license. Contact the
+   author for commercial licensing terms.
+
+6. ATTRIBUTION
+   When redistributing modified or unmodified copies, retain this LICENSE
+   file and the THIRD_PARTY_LICENSES.txt file. Attribution to "LiveStreamSound
+   by Jakob Eichberger" is appreciated in derived projects but not required.
+
+For questions, see the GitHub repository or contact the author at
+<jakob@eichberger.tech>.

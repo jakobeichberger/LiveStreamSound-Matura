@@ -18,6 +18,8 @@ public sealed class ControlClient : IAsyncDisposable
     private Task? _readLoop;
     private Timer? _pongWatchdog;
     public Welcome? Welcome { get; private set; }
+    /// <summary>Session AEAD/MAC service derived from (code, salt) — set after a verified Welcome.</summary>
+    public SessionCrypto? Crypto { get; private set; }
     public ControlClientState State { get; private set; } = ControlClientState.Idle;
     public IPAddress? HostAddress { get; private set; }
     public int HostControlPort { get; private set; }
@@ -86,7 +88,33 @@ public sealed class ControlClient : IAsyncDisposable
             switch (response)
             {
                 case Welcome welcome:
+                    // Verify Welcome-MAC before accepting the connection. Defends
+                    // against a fake host on the LAN that claims our session
+                    // name in mDNS but doesn't know the session code.
+                    var salt = SessionCrypto.FromHex(welcome.SessionSaltHex);
+                    var mac = SessionCrypto.FromHex(welcome.WelcomeMacHex);
+                    if (salt is null || mac is null || salt.Length < 8)
+                    {
+                        SetState(ControlClientState.Failed);
+                        ConnectionError?.Invoke("AUTH_FAIL:WELCOME_MALFORMED");
+                        return null;
+                    }
+                    var derivedCrypto = SessionCrypto.Derive(code, salt);
+                    var canonical = SessionCrypto.CanonicalWelcomeBytes(
+                        welcome.ClientId, welcome.AudioUdpPort, welcome.SampleRate,
+                        welcome.Channels, welcome.AudioCodec, welcome.ServerTimeMs,
+                        welcome.SessionSaltHex);
+                    if (!derivedCrypto.VerifyMac(canonical, mac))
+                    {
+                        SetState(ControlClientState.Failed);
+                        ConnectionError?.Invoke("AUTH_FAIL:WELCOME_MAC_INVALID");
+                        _log.Warn("ControlClient",
+                            $"Rejected WELCOME from {host}:{controlPort} — MAC invalid (host doesn't know session code)");
+                        return null;
+                    }
+
                     Welcome = welcome;
+                    Crypto = derivedCrypto;
                     LastInboundFrameAt = DateTimeOffset.UtcNow;
                     SetState(ControlClientState.Connected);
                     _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -200,9 +228,16 @@ public sealed class ControlClient : IAsyncDisposable
     {
         // Dispose the watchdog FIRST so a tick mid-Dispose can't observe a
         // half-torn-down socket and close a freshly-assigned one from a
-        // concurrent ConnectAsync.
-        _pongWatchdog?.Dispose();
-        _pongWatchdog = null;
+        // concurrent ConnectAsync. Use DisposeAsync (System.Threading.Timer
+        // implements IAsyncDisposable since .NET 8) so we deterministically
+        // wait for any executing callback to complete — Timer.Dispose() is
+        // non-blocking and a tick scheduled microseconds before us would
+        // run concurrently with the rest of teardown.
+        if (_pongWatchdog is not null)
+        {
+            await _pongWatchdog.DisposeAsync().ConfigureAwait(false);
+            _pongWatchdog = null;
+        }
 
         try { _cts?.Cancel(); } catch { }
         try { _stream?.Close(); } catch { }
@@ -217,6 +252,7 @@ public sealed class ControlClient : IAsyncDisposable
         _cts = null;
         _readLoop = null;
         Welcome = null;
+        Crypto = null;
         // Reset silence-tracking so a fast reconnect doesn't see a stale
         // "last frame at" from the previous connection.
         LastInboundFrameAt = DateTimeOffset.MinValue;

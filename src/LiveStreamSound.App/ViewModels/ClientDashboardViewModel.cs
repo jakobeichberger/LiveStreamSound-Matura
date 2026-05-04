@@ -376,6 +376,22 @@ public partial class ClientDashboardViewModel : ObservableObject
         try { System.Diagnostics.Process.Start("explorer.exe", _orchestrator.Log.LogDirectory); }
         catch { }
     }
+
+    [RelayCommand]
+    private void BuildDiagnosticsBundle()
+    {
+        try
+        {
+            var path = DiagnosticsBundleService.Build("Client");
+            _orchestrator.Log.Info("UI", $"Diagnose-Paket erstellt: {path}");
+            try { System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{path}\""); } catch { }
+        }
+        catch (Exception ex)
+        {
+            _orchestrator.Log.Warn("UI", "Diagnose-Paket konnte nicht erstellt werden", ex);
+        }
+    }
+
     [RelayCommand] private void ClearLogView() => LogEntries.Clear();
 
     [RelayCommand]

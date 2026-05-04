@@ -365,6 +365,11 @@
                         <ui:Button Icon="{ui:SymbolIcon FolderOpen24}"
                                    Content="{Binding [LogOpenFolder], Source={x:Static loc:Loc.Instance}}"
                                    Command="{Binding OpenLogFolderCommand}" Margin="0,0,8,0"/>
+                        <ui:Button Icon="{ui:SymbolIcon ArchiveSettings24}"
+                                   Appearance="Secondary"
+                                   Content="{Binding [LogBundle], Source={x:Static loc:Loc.Instance}}"
+                                   ToolTip="{Binding [LogBundleTooltip], Source={x:Static loc:Loc.Instance}}"
+                                   Command="{Binding BuildDiagnosticsBundleCommand}" Margin="0,0,8,0"/>
                         <ui:Button Icon="{ui:SymbolIcon Broom24}"
                                    Content="{Binding [LogClear], Source={x:Static loc:Loc.Instance}}"
                                    Command="{Binding ClearLogViewCommand}"/>

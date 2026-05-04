@@ -100,6 +100,15 @@
                                Content="{Binding [Invite.OpenInviteDialog], Source={x:Static loc:Loc.Instance}}"
                                Command="{Binding OpenInviteDialogCommand}"
                                Visibility="{Binding IsSessionActive, Converter={StaticResource BoolToVis}}"/>
+                    <!-- Pre-flight test tone: lets the teacher verify the room
+                         is receiving before launching the actual exam audio. -->
+                    <ui:Button Margin="8,0,0,0" VerticalAlignment="Center"
+                               Icon="{ui:SymbolIcon MusicNote2Play24}"
+                               Appearance="Secondary"
+                               Content="{Binding [Host.TestTone], Source={x:Static loc:Loc.Instance}}"
+                               ToolTip="{Binding [Host.TestToneTooltip], Source={x:Static loc:Loc.Instance}}"
+                               Command="{Binding StartTestToneCommand}"
+                               Visibility="{Binding IsSessionActive, Converter={StaticResource BoolToVis}}"/>
 
                     <!-- Host self-mute toggle: keeps the teacher's laptop quiet
                          while the stream goes out to clients. Persisted across launches. -->
@@ -380,6 +389,12 @@
                         <ui:Button Icon="{ui:SymbolIcon FolderOpen24}"
                                    Content="{Binding [LogOpenFolder], Source={x:Static loc:Loc.Instance}}"
                                    Command="{Binding OpenLogFolderCommand}"
+                                   Margin="0,0,8,0"/>
+                        <ui:Button Icon="{ui:SymbolIcon ArchiveSettings24}"
+                                   Appearance="Secondary"
+                                   Content="{Binding [LogBundle], Source={x:Static loc:Loc.Instance}}"
+                                   ToolTip="{Binding [LogBundleTooltip], Source={x:Static loc:Loc.Instance}}"
+                                   Command="{Binding BuildDiagnosticsBundleCommand}"
                                    Margin="0,0,8,0"/>
                         <ui:Button Icon="{ui:SymbolIcon Broom24}"
                                    Content="{Binding [LogClear], Source={x:Static loc:Loc.Instance}}"

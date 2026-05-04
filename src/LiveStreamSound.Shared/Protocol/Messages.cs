@@ -6,13 +6,25 @@ public record Hello(
     int ProtocolVersion
 ) : ControlMessage;
 
+/// <summary>
+/// Server's response after a successful HELLO. As of protocol v2 this carries:
+/// - <see cref="SessionSaltHex"/>: random 16-byte salt, hex-encoded. Combined with the
+///   session code via HKDF on both sides to derive the session AEAD key.
+///   Salt is observable on the wire, but useless without the code.
+/// - <see cref="WelcomeMacHex"/>: HMAC-SHA256 (truncated to 16 bytes, hex-encoded)
+///   over (ClientId|AudioUdpPort|SampleRate|Channels|AudioCodec|ServerTimeMs|
+///   SessionSaltHex). Lets the client verify it's talking to a host that knows
+///   the code, defending against fake-host mDNS spoofing.
+/// </summary>
 public record Welcome(
     string ClientId,
     int AudioUdpPort,
     int SampleRate,
     int Channels,
     string AudioCodec,
-    long ServerTimeMs
+    long ServerTimeMs,
+    string SessionSaltHex,
+    string WelcomeMacHex
 ) : ControlMessage;
 
 public record AuthFail(string Reason) : ControlMessage;

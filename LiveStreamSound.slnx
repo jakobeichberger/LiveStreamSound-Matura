@@ -13,5 +13,6 @@
     <Project Path="tests/LiveStreamSound.Shared.Tests/LiveStreamSound.Shared.Tests.csproj" />
     <Project Path="tests/LiveStreamSound.Host.Tests/LiveStreamSound.Host.Tests.csproj" />
     <Project Path="tests/LiveStreamSound.Client.Tests/LiveStreamSound.Client.Tests.csproj" />
+    <Project Path="tests/LiveStreamSound.Integration.Tests/LiveStreamSound.Integration.Tests.csproj" />
   </Folder>
 </Solution>

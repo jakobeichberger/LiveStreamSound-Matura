@@ -36,7 +36,9 @@ public class ControlMessageTests
             SampleRate: 48000,
             Channels: 2,
             AudioCodec: "opus",
-            ServerTimeMs: 1_700_000_000_000L);
+            ServerTimeMs: 1_700_000_000_000L,
+            SessionSaltHex: "deadbeef00112233",
+            WelcomeMacHex: "00112233445566778899aabbccddeeff");
         var json = MessageJson.Serialize(w);
         var rt = (Welcome)MessageJson.Deserialize(json)!;
         Assert.Equal(w, rt);
@@ -196,7 +198,7 @@ public class ControlMessageTests
         ControlMessage[] all =
         {
             new Hello("000001", "A", 1),
-            new Welcome("id-1", 5001, 48000, 2, "opus", 0),
+            new Welcome("id-1", 5001, 48000, 2, "opus", 0, "salt", "mac"),
             new Ping(1),
             new SetVolume(0.3f),
             new Kick("done"),
@@ -302,7 +304,7 @@ public class ControlMessageTests
     [Fact]
     public void Serialize_UsesCamelCase()
     {
-        var json = MessageJson.Serialize(new Welcome("id", 5001, 48000, 2, "opus", 99));
+        var json = MessageJson.Serialize(new Welcome("id", 5001, 48000, 2, "opus", 99, "salt", "mac"));
         // camelCase from JsonSerializerDefaults.Web
         Assert.Contains("\"clientId\":\"id\"", json);
         Assert.Contains("\"audioUdpPort\":5001", json);

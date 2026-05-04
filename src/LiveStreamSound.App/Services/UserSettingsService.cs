@@ -12,6 +12,9 @@ public sealed class UserSettingsService
 {
     public sealed class UserSettings
     {
+        /// <summary>Schema version for migration on field additions.</summary>
+        public int SchemaVersion { get; set; } = 1;
+
         /// <summary>If true, the Client dashboard shows the technician view
         /// (sparklines, raw metrics, log) instead of the simple status pane.</summary>
         public bool ClientTechnicianMode { get; set; }
@@ -19,6 +22,9 @@ public sealed class UserSettingsService
         /// <summary>If true, the Host auto-mutes its system audio output when
         /// starting a session (restored on stop).</summary>
         public bool HostAutoMuteOnSessionStart { get; set; } = true;
+
+        /// <summary>"de" or "en" — restored on launch. null = use system detection.</summary>
+        public string? Language { get; set; }
     }
 
     private static readonly JsonSerializerOptions JsonOpts = new()

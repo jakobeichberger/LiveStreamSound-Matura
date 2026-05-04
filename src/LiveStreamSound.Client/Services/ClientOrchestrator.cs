@@ -122,6 +122,12 @@ public sealed class ClientOrchestrator : IAsyncDisposable
 
     private async Task StartAudioPipelineAsync(CancellationToken ct)
     {
+        // Propagate AEAD crypto + expected-source-IP filter to the receive
+        // pipeline. Filtering by source IP defends against UDP injection from
+        // anyone else on the LAN; AEAD belt-and-suspenders ensures even a
+        // perfectly-spoofed source-IP can't inject playable audio.
+        AudioIn.Crypto = Control.Crypto;
+        AudioIn.ExpectedSource = Control.HostAddress;
         // Ephemeral UDP port — lets host+client coexist on one machine.
         await AudioIn.StartAsync(port: 0);
         Playback.Start();
@@ -335,8 +341,14 @@ public sealed class ClientOrchestrator : IAsyncDisposable
 
     private void DrainToPlayback()
     {
-        foreach (var pcm in Buffer.DrainReady())
-            Playback.WritePcm(pcm);
+        // Use the pooled-aware drain so we can return rented buffers to
+        // ArrayPool after WritePcm has copied the data into NAudio's internal
+        // buffer. Avoids 192 KB/s of Gen0 churn on the hot path.
+        foreach (var (pcm, length) in Buffer.DrainReadyAsPooled())
+        {
+            try { Playback.WritePcm(pcm, length); }
+            finally { System.Buffers.ArrayPool<byte>.Shared.Return(pcm); }
+        }
     }
 
     private void SendStatus()
