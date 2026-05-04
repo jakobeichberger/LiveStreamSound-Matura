@@ -13,7 +13,8 @@ public sealed class DiagnosticsService : IDisposable
     private readonly SessionManager _sessions;
     private readonly AudioPipelineState _pipeline;
     private readonly LogService _log;
-    private readonly Timer _timer;
+    private readonly CancellationTokenSource _cts = new();
+    private readonly Task _tickTask;
     private readonly ConcurrentQueue<uint> _recentSequence = new();
 
     public event Action<ConnectedClient>? ClientQualityUpdated;
@@ -23,7 +24,25 @@ public sealed class DiagnosticsService : IDisposable
         _sessions = sessions;
         _pipeline = pipeline;
         _log = log;
-        _timer = new Timer(_ => Tick(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        // PeriodicTimer + serial loop guarantees Tick() never re-enters itself
+        // even if a UI subscriber blocks the event for >1s. The original
+        // Timer-callback model would fire concurrently from the thread pool
+        // and corrupt the un-synchronized client state fields.
+        _tickTask = Task.Run(() => RunTickLoopAsync(_cts.Token));
+    }
+
+    private async Task RunTickLoopAsync(CancellationToken ct)
+    {
+        using var t = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        try
+        {
+            while (await t.WaitForNextTickAsync(ct).ConfigureAwait(false))
+            {
+                try { Tick(); }
+                catch (Exception ex) { _log.Warn("Diagnostics", "Tick failed", ex); }
+            }
+        }
+        catch (OperationCanceledException) { }
     }
 
     private void Tick()
@@ -75,7 +94,12 @@ public sealed class DiagnosticsService : IDisposable
         return QualityLevel.Good;
     }
 
-    public void Dispose() => _timer.Dispose();
+    public void Dispose()
+    {
+        try { _cts.Cancel(); } catch { }
+        try { _tickTask.Wait(TimeSpan.FromSeconds(2)); } catch { }
+        _cts.Dispose();
+    }
 }
 
 /// <summary>

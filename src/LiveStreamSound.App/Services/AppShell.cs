@@ -22,11 +22,15 @@ public sealed class AppShell
     /// <summary>Persistent UI/behaviour preferences (technician mode, host auto-mute, …).</summary>
     public UserSettingsService Settings { get; } = new();
 
+    /// <summary>Suppresses Windows sleep/lid-close hibernation while a session is active.</summary>
+    public SleepSuppressionService Sleep { get; } = new();
+
     private Window? _currentWindow;
 
     public void ShowRoleSelection()
     {
         DisposeCurrentRole();
+        Sleep.End();
         CurrentRole = Role.None;
         SwapTo(() => new RoleSelectionWindow());
     }
@@ -36,6 +40,7 @@ public sealed class AppShell
         DisposeCurrentRole();
         Host = new HostOrchestrator();
         CurrentRole = Role.Host;
+        Sleep.Begin();
         SwapTo(() => new HostDashboardWindow());
     }
 
@@ -46,6 +51,7 @@ public sealed class AppShell
         Client.Discovery.Start();
         Client.StartIdleListener();
         CurrentRole = Role.Client;
+        Sleep.Begin();
         SwapTo(() => new ClientDashboardWindow());
     }
 

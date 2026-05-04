@@ -10,6 +10,9 @@ public static class MessageJson
     public static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web)
     {
         WriteIndented = false,
+        // Cap recursion depth — our message graph is flat (depth 1-2), so a
+        // peer trying to send 60-level-deep JSON is up to no good.
+        MaxDepth = 8,
     };
 
     public static string Serialize(ControlMessage message) =>

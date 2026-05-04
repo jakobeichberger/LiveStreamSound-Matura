@@ -50,8 +50,20 @@ public sealed class Loc : INotifyPropertyChanged
     {
         try
         {
+            // German UI culture → German (obvious case).
             var two = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
-            return two == "de" ? Lang.German : Lang.English;
+            if (two == "de") return Lang.German;
+
+            // For Austrian-region installs with non-German UI culture (Italian
+            // South Tyrol, Croatian/Hungarian/Slovenian border regions), fall
+            // back to German since the operator + app docs are German.
+            var region = RegionInfo.CurrentRegion?.TwoLetterISORegionName;
+            if (region == "AT") return Lang.German;
+            // Neighboring regions where Austrian schools also have presence.
+            if (two is "it" or "hr" or "hu" or "sl" or "cs" or "sk")
+                return Lang.German;
+
+            return Lang.English;
         }
         catch
         {
@@ -107,6 +119,18 @@ public sealed class Loc : INotifyPropertyChanged
         ["Host.GroupWorkshop"] = new("Werkstatt", "Workshop"),
         ["Host.GroupRooms"] = new("Räume", "Rooms"),
         ["Host.GroupOther"] = new("Sonstige Geräte", "Other devices"),
+        ["Host.TestTone"] = new(
+            "Test-Ton (10s)",
+            "Test tone (10s)"),
+        ["Host.TestToneTooltip"] = new(
+            "Spielt 10 Sekunden lang einen 440-Hz-Ton ab. Vor der Prüfung verwenden um zu testen ob alle Räume den Stream empfangen.",
+            "Plays a 10-second 440 Hz tone. Use before the exam to verify every room is receiving the stream."),
+        ["LogBundle"] = new(
+            "Diagnose-Paket erstellen",
+            "Create diagnostics bundle"),
+        ["LogBundleTooltip"] = new(
+            "Packt alle Log-Dateien + System-Info in eine ZIP auf den Desktop — ideal um Probleme an den Entwickler zu schicken.",
+            "Bundles all log files + system info into a ZIP on the Desktop — ideal for emailing the developer."),
         ["Host.AutoMuteToggle"] = new(
             "Host stumm während Session",
             "Mute host during session"),
@@ -306,6 +330,14 @@ public sealed class Loc : INotifyPropertyChanged
         ["Issue.ClientNotResponding.Body"] = new(
             "Der Client meldet seit mehreren Sekunden keinen Status. Möglicherweise ist er eingeschlafen oder nicht mehr im Netz.",
             "The client hasn't reported status for several seconds. It may be asleep or off the network."),
+        ["Issue.SystemClockSuspect.Title"] = new("Systemzeit weicht stark ab", "System clock looks wrong"),
+        ["Issue.SystemClockSuspect.Body"] = new(
+            "Die Systemzeit dieses Laptops weicht um mehr als einen Tag von der Host-Zeit ab — vermutlich leere CMOS-Batterie oder gerade gebootet ohne NTP. Audio läuft weiter aber der Synchronisations-Mechanismus arbeitet eingeschränkt. Bitte Datum/Uhrzeit in den Windows-Einstellungen prüfen.",
+            "This laptop's clock differs from the host by more than a day — most likely a dead CMOS battery or just-booted without NTP. Audio still plays but sync is degraded. Please check the date/time in Windows settings."),
+        ["Issue.ProtocolVersionMismatch.Title"] = new("Versions-Konflikt", "Version mismatch"),
+        ["Issue.ProtocolVersionMismatch.Body"] = new(
+            "Host und Client haben unterschiedliche Versionen. Bitte beide auf dieselbe LiveStreamSound-Version aktualisieren.",
+            "Host and client are running different LiveStreamSound versions. Please update both to the same version."),
 
         // Help page — Host
         ["HelpHost.Title"] = new("Bedienungshilfe — Host", "How to use — Host"),

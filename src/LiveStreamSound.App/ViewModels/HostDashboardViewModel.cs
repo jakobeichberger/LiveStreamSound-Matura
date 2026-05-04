@@ -211,23 +211,48 @@ public partial class HostDashboardViewModel : ObservableObject
     /// case-insensitive key. Used so a connected tile (raw "HP-KB-017") and an
     /// idle-client mDNS advertisement (friendly "Raum 017") deduplicate against
     /// each other.
+    /// <para>
+    /// Strategy: try Classify on the raw input first (catches HP-KB-017 etc.).
+    /// If that returns Sonstige, also try parsing well-known German/English
+    /// friendly-prefix patterns ("Raum 017", "Werkstatt 38", "Room 17") so a
+    /// pre-friendly-ified label still matches the raw form.
+    /// Pure-digit fallback removed — it caused false-positive collisions
+    /// (e.g. DESKTOP-A1B2C3 → "123" collided with "Raum 123").
+    /// </para>
     /// </summary>
     internal static string CanonicalKey(string nameOrFriendly)
     {
         if (string.IsNullOrWhiteSpace(nameOrFriendly)) return "";
+
         var parsed = ClassroomLaptopName.Classify(nameOrFriendly);
         if (parsed.Category != LaptopCategory.Sonstige)
-            return $"{parsed.Category}|{parsed.Room}|{parsed.DeviceIndex}";
+            return CategoryKey(parsed.Category, parsed.Room, parsed.DeviceIndex);
 
-        // Fallback: the friendly name might already be in "Raum X (Gerät Y)"
-        // form (passed through ClassroomLaptopName.FriendlyName once). Strip
-        // it back to its components by extracting digits.
-        var digits = string.Concat(nameOrFriendly.Where(char.IsDigit));
-        if (!string.IsNullOrEmpty(digits))
-            return $"digits|{digits}";
+        // Friendly-prefix patterns. "(Gerät 2)" / "(device 2)" optional suffix.
+        var trimmed = nameOrFriendly.Trim();
+        var m = System.Text.RegularExpressions.Regex.Match(
+            trimmed,
+            @"^(?<prefix>Raum|Room|Werkstatt|Workshop)\s+(?<room>\d{1,4})(?:\s*\((?:Gerät|device)\s*(?<device>\d+)\))?$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (m.Success)
+        {
+            var prefix = m.Groups["prefix"].Value.ToLowerInvariant();
+            var category = prefix is "raum" or "room"
+                ? LaptopCategory.Klassenraum
+                : LaptopCategory.Werkstatt;
+            // Pad room to 3 digits so "Raum 17" and "HP-KB-017" both hash to "017".
+            var room = m.Groups["room"].Value.PadLeft(3, '0');
+            int? device = m.Groups["device"].Success ? int.Parse(m.Groups["device"].Value) : null;
+            return CategoryKey(category, room, device);
+        }
 
-        return nameOrFriendly.Trim().ToLowerInvariant();
+        // Truly unrecognized: fall back to the trimmed lowercase string itself.
+        // No digit-only collapse — that caused collisions across distinct rooms.
+        return $"raw|{trimmed.ToLowerInvariant()}";
     }
+
+    private static string CategoryKey(LaptopCategory cat, string room, int? device) =>
+        $"{cat}|{room}|{device}";
 
     private void OnClientQualityUpdated(ConnectedClient c) =>
         _dispatcher.Invoke(() => FindVm(c.ClientId)?.UpdateFromModel());
@@ -293,6 +318,18 @@ public partial class HostDashboardViewModel : ObservableObject
     [RelayCommand] private async Task StopSessionAsync() =>
         await _orchestrator.StopSessionAsync();
 
+    /// <summary>
+    /// Pre-flight test tone: emits a 10s 440Hz sine through the encode +
+    /// broadcast pipeline so the teacher can verify "all clients are
+    /// receiving" before launching the actual exam audio.
+    /// </summary>
+    [RelayCommand]
+    private void StartTestTone()
+    {
+        if (!_orchestrator.Sessions.IsActive) return;
+        _orchestrator.TestTone.Start();
+    }
+
     [RelayCommand] private void ToggleLanguage() => Loc.Instance.Toggle();
 
     [RelayCommand]
@@ -332,6 +369,22 @@ public partial class HostDashboardViewModel : ObservableObject
     {
         try { System.Diagnostics.Process.Start("explorer.exe", _orchestrator.Log.LogDirectory); }
         catch { }
+    }
+
+    [RelayCommand]
+    private void BuildDiagnosticsBundle()
+    {
+        try
+        {
+            var path = DiagnosticsBundleService.Build("Host");
+            _orchestrator.Log.Info("UI", $"Diagnose-Paket erstellt: {path}");
+            // Highlight the file in Explorer so the teacher sees where it landed.
+            try { System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{path}\""); } catch { }
+        }
+        catch (Exception ex)
+        {
+            _orchestrator.Log.Warn("UI", "Diagnose-Paket konnte nicht erstellt werden", ex);
+        }
     }
 
     [RelayCommand] private void ClearLogView() => LogEntries.Clear();

@@ -4,6 +4,7 @@ using System.Net.Sockets;
 using LiveStreamSound.Shared.Audio;
 using LiveStreamSound.Shared.Discovery;
 using LiveStreamSound.Shared.Protocol;
+using Protocol = LiveStreamSound.Shared.Protocol;
 
 namespace LiveStreamSound.Host.Services;
 
@@ -26,6 +27,7 @@ public sealed class HostOrchestrator : IAsyncDisposable
     public IdleClientDiscoveryService IdleClientDiscovery { get; }
     public InviteClientService InviteClient { get; }
     public HostMonitorMuteService MonitorMute { get; }
+    public TestToneService TestTone { get; }
 
     public string? LocalIp { get; private set; }
 
@@ -50,8 +52,13 @@ public sealed class HostOrchestrator : IAsyncDisposable
         IdleClientDiscovery = new IdleClientDiscoveryService(Log);
         InviteClient = new InviteClientService(Log);
         MonitorMute = new HostMonitorMuteService(Log);
+        TestTone = new TestToneService(Log);
 
         Capture.FrameAvailable += OnPcmFrame;
+        // The test-tone service feeds synthesized frames straight through the
+        // same encode + broadcast path so a teacher can verify "is this client
+        // hearing me?" without launching VLC.
+        TestTone.FrameAvailable += OnPcmFrame;
         Capture.CaptureError += ex => Log.Error("Capture", "Recording error", ex);
         // NOTE: the client sends AudioClientReady over TCP with its actual bound
         // UDP port after HELLO. That message updates client.AudioEndpoint with
@@ -126,6 +133,26 @@ public sealed class HostOrchestrator : IAsyncDisposable
 
     public async Task StopSessionAsync()
     {
+        // Send a graceful SessionEnding to every client BEFORE we tear down
+        // the control channel, so clients see "host ended the session"
+        // (terminal, no auto-reconnect) instead of treating it as a transient
+        // drop and going into reconnect-loop hell for ~30 seconds.
+        if (Sessions.IsActive)
+        {
+            try
+            {
+                using var bcastTimeout = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
+                await Control.BroadcastAsync(
+                    new Protocol.SessionEnding("host stopped"), bcastTimeout.Token);
+            }
+            catch (Exception ex)
+            {
+                Log.Debug("Orchestrator", $"SessionEnding broadcast failed: {ex.Message}");
+            }
+        }
+        // Print end-of-session summary BEFORE tearing things down so we
+        // capture peak-client-count and total-clients-seen.
+        EmitSessionSummary();
         Capture.Stop();
         MDns.Dispose();
         await Control.DisposeAsync();
@@ -134,6 +161,21 @@ public sealed class HostOrchestrator : IAsyncDisposable
         // Restore host's pre-session mute state (no-op if we never muted).
         MonitorMute.Restore();
         Log.Info("Orchestrator", "Session stopped");
+    }
+
+    private void EmitSessionSummary()
+    {
+        try
+        {
+            var duration = Sessions.StartedAt.HasValue
+                ? DateTimeOffset.Now - Sessions.StartedAt.Value
+                : TimeSpan.Zero;
+            var clientCount = Sessions.Clients.Count;
+            Log.Info("Session",
+                $"End-of-session: duration={duration:hh\\:mm\\:ss}, " +
+                $"final-clients={clientCount}");
+        }
+        catch { /* best effort */ }
     }
 
     // Max Opus packet size per RFC 7845 is 1275 bytes. Reused per frame (50×/s) to
@@ -186,6 +228,7 @@ public sealed class HostOrchestrator : IAsyncDisposable
         await StopSessionAsync();
         IdleClientDiscovery.Dispose();
         Capture.Dispose();
+        TestTone.Dispose();
         Diagnostics.Dispose();
         Sessions.Dispose();
         MonitorMute.Dispose();

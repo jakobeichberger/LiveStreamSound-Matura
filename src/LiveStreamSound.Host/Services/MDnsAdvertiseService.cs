@@ -13,6 +13,10 @@ public sealed class MDnsAdvertiseService : IDisposable
 
     public void Advertise(string instanceName, int controlPort, string sessionName)
     {
+        // Defensive: if Advertise is called twice without Dispose between (e.g.
+        // session restart in the same orchestrator), tear down the previous
+        // mDNS pair first. Otherwise both _mc and _sd from the prior call leak.
+        Dispose();
         try
         {
             var profile = new ServiceProfile(

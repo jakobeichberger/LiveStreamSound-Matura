@@ -39,6 +39,24 @@ public partial class App : Application
         var system = ApplicationThemeManager.GetSystemTheme();
         var initial = system == SystemTheme.Light ? ApplicationTheme.Light : ApplicationTheme.Dark;
         ApplicationThemeManager.Apply(initial);
+
+        // Restore persisted language preference (overrides DetectInitialLanguage).
+        // Subscribe to Loc.Language changes so user toggles are persisted too.
+        var settings = AppShell.Current.Settings;
+        if (!string.IsNullOrEmpty(settings.Current.Language))
+        {
+            var loc = LiveStreamSound.Shared.Localization.Loc.Instance;
+            loc.Language = settings.Current.Language == "en"
+                ? LiveStreamSound.Shared.Localization.Loc.Lang.English
+                : LiveStreamSound.Shared.Localization.Loc.Lang.German;
+        }
+        LiveStreamSound.Shared.Localization.Loc.Instance.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName != nameof(LiveStreamSound.Shared.Localization.Loc.Language)) return;
+            settings.Current.Language = LiveStreamSound.Shared.Localization.Loc.Instance.IsGerman ? "de" : "en";
+            settings.Save();
+        };
+
         AppShell.Current.ShowRoleSelection();
     }
 

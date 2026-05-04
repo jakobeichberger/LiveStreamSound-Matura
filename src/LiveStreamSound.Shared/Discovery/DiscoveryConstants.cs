@@ -14,7 +14,11 @@ public static class DiscoveryConstants
     /// <summary>mDNS service type advertised by idle clients waiting for a host invitation.</summary>
     public const string MDnsClientServiceType = "_lssclient._tcp";
 
-    public const int ProtocolVersion = 1;
+    /// <summary>
+    /// Wire-protocol version. Bumped to 2 when AEAD encryption + Welcome-MAC
+    /// were added. v1 clients rejected by v2 hosts at HELLO and vice-versa.
+    /// </summary>
+    public const int ProtocolVersion = 2;
 
     public const string TxtVersionKey = "v";
     public const string TxtSessionNameKey = "name";

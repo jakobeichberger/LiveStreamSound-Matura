@@ -20,7 +20,8 @@ public class DiscoveryConstantsTests
     [Fact]
     public void ProtocolVersion_IsCurrent()
     {
-        Assert.Equal(1, DiscoveryConstants.ProtocolVersion);
+        // Bumped to 2 when AEAD audio + Welcome-MAC were added.
+        Assert.Equal(2, DiscoveryConstants.ProtocolVersion);
     }
 
     [Fact]

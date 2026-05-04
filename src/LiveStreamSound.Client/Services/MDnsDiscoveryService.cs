@@ -144,9 +144,17 @@ public sealed class MDnsDiscoveryService : IDisposable
 
     public void Dispose()
     {
+        // Unsubscribe before dispose so a final-event-fire mid-dispose doesn't
+        // surface through stale handler references.
+        if (_sd is not null)
+        {
+            try { _sd.ServiceInstanceDiscovered -= OnServiceInstanceDiscovered; } catch { }
+            try { _sd.ServiceInstanceShutdown -= OnServiceInstanceShutdown; } catch { }
+        }
         try { _sd?.Dispose(); } catch { }
         try { _mc?.Dispose(); } catch { }
         _sd = null;
         _mc = null;
+        lock (_lock) _hosts.Clear();
     }
 }

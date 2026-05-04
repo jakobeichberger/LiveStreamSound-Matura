@@ -51,6 +51,12 @@ public sealed class SessionManager : IDisposable
     public Guid SessionId { get; private set; }
     public bool IsActive => Code is not null;
     public DateTimeOffset? StartedAt { get; private set; }
+    /// <summary>Random per-session salt. Derived crypto key = HKDF(code, salt).</summary>
+    public byte[] SessionSalt { get; private set; } = Array.Empty<byte>();
+    /// <summary>Hex form of <see cref="SessionSalt"/> for wire transport.</summary>
+    public string SessionSaltHex { get; private set; } = "";
+    /// <summary>Crypto for AEAD audio + Welcome-MAC. Null until session starts.</summary>
+    public LiveStreamSound.Shared.Protocol.SessionCrypto? Crypto { get; private set; }
 
     /// <summary>A genuinely new client is connecting for the first time in this session.</summary>
     public event Action<ConnectedClient>? ClientJoined;
@@ -71,8 +77,13 @@ public sealed class SessionManager : IDisposable
     /// <summary>
     /// How long a disconnected client's state is preserved for a possible rejoin.
     /// Beyond this, the grace period lapses and the client is fully removed.
+    /// <para>
+    /// Default 5 minutes — covers a fire-alarm scenario (everyone leaves the
+    /// room, comes back, lid was closed, Wi-Fi cycled). The cost is just a
+    /// dimmed tile during that window; the teacher can hard-kick manually.
+    /// </para>
     /// </summary>
-    public TimeSpan RejoinGracePeriod { get; set; } = TimeSpan.FromSeconds(60);
+    public TimeSpan RejoinGracePeriod { get; set; } = TimeSpan.FromMinutes(5);
 
     public SessionManager(LogService log)
     {
@@ -91,6 +102,12 @@ public sealed class SessionManager : IDisposable
         Code = SessionCode.Generate();
         SessionId = Guid.NewGuid();
         StartedAt = DateTimeOffset.Now;
+        // Generate a fresh per-session salt and derive the AEAD/MAC key from
+        // (code, salt). Salt is sent to clients on WELCOME; without the code
+        // an eavesdropper can't reconstruct the key.
+        SessionSalt = LiveStreamSound.Shared.Protocol.SessionCrypto.GenerateSalt();
+        SessionSaltHex = LiveStreamSound.Shared.Protocol.SessionCrypto.ToHex(SessionSalt);
+        Crypto = LiveStreamSound.Shared.Protocol.SessionCrypto.Derive(Code, SessionSalt);
         ResumeSweep();
         // Deliberately not logging the code — file logs shouldn't contain the secret.
         // The UI shows it plainly and the client gets it via HELLO anyway.
@@ -113,6 +130,9 @@ public sealed class SessionManager : IDisposable
         _clients.Clear();
         Code = null;
         StartedAt = null;
+        SessionSalt = Array.Empty<byte>();
+        SessionSaltHex = "";
+        Crypto = null;
         SessionStateChanged?.Invoke();
     }
 
@@ -150,9 +170,15 @@ public sealed class SessionManager : IDisposable
     /// </summary>
     public void FinalizeRejoin(ConnectedClient client)
     {
-        client.IsReconnecting = false;
-        client.ReconnectingSince = null;
+        // ORDER MATTERS — AudioStreamServer.ActiveClients is filtered by
+        // !IsReconnecting and the broadcast loop iterates 50× per second.
+        // We must clear AudioEndpoint *before* flipping IsReconnecting to
+        // false, otherwise a frame can land in the nanosecond window where
+        // the client is "active" but still holds its stale pre-roam endpoint
+        // — exactly the bug this method was supposed to prevent.
         client.AudioEndpoint = null;
+        client.ReconnectingSince = null;
+        client.IsReconnecting = false;
         _log.Info("Session",
             $"Client rejoined within grace period: {client.ClientName} ({client.ClientId}), " +
             $"volume={client.Volume:F2} muted={client.IsMuted}");
