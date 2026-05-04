@@ -91,6 +91,7 @@ public sealed class SessionManager : IDisposable
         Code = SessionCode.Generate();
         SessionId = Guid.NewGuid();
         StartedAt = DateTimeOffset.Now;
+        ResumeSweep();
         // Deliberately not logging the code — file logs shouldn't contain the secret.
         // The UI shows it plainly and the client gets it via HELLO anyway.
         _log.Info("Session", $"Session started, id={SessionId}");
@@ -101,6 +102,10 @@ public sealed class SessionManager : IDisposable
     public void StopSession()
     {
         _log.Info("Session", $"Session stopping (had {_clients.Count} clients)");
+        // Pause the sweep timer so it can't fire ClientLeft for stale entries
+        // *after* the session ended (which would race the dashboard cleanup
+        // and leave a ghost tile in some timing windows).
+        try { _sweepTimer.Change(Timeout.Infinite, Timeout.Infinite); } catch { }
         foreach (var client in _clients.Values)
         {
             try { client.TcpClient.Close(); } catch { }
@@ -110,6 +115,10 @@ public sealed class SessionManager : IDisposable
         StartedAt = null;
         SessionStateChanged?.Invoke();
     }
+
+    /// <summary>Resume the sweep timer after a fresh <see cref="StartSession"/>.</summary>
+    private void ResumeSweep() =>
+        _sweepTimer.Change(TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
 
     public bool ValidateCode(string code) =>
         IsActive && string.Equals(code, Code, StringComparison.Ordinal);
@@ -130,11 +139,20 @@ public sealed class SessionManager : IDisposable
     /// Called after a rejoin match — caller has already updated TcpClient /
     /// TcpEndpoint / WriteLock with the new connection. Clears the reconnecting
     /// flag and fires <see cref="ClientRejoined"/>.
+    /// <para>
+    /// AudioEndpoint is also cleared: the rejoining client may have roamed
+    /// APs (different IP) or rebooted (different ephemeral port), and
+    /// AudioStreamServer.ActiveClients filters out clients without an audio
+    /// endpoint, so audio resumes only after the client re-announces with
+    /// <see cref="Protocol.AudioClientReady"/>. Prevents silent broadcasting
+    /// to a stale IP for ~1 second after roam.
+    /// </para>
     /// </summary>
     public void FinalizeRejoin(ConnectedClient client)
     {
         client.IsReconnecting = false;
         client.ReconnectingSince = null;
+        client.AudioEndpoint = null;
         _log.Info("Session",
             $"Client rejoined within grace period: {client.ClientName} ({client.ClientId}), " +
             $"volume={client.Volume:F2} muted={client.IsMuted}");

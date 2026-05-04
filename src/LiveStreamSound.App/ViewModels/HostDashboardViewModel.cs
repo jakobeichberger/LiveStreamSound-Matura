@@ -160,18 +160,26 @@ public partial class HostDashboardViewModel : ObservableObject
             // Build the desired notification set: idle clients that are
             // (a) not already represented as a tile in any client group, and
             // (b) not currently dismissed within the resuppression window.
-            var connectedNames = ClientGroups
+            //
+            // Connected tiles store the RAW hostname ("HP-KB-017") while idle
+            // clients advertise the FRIENDLY name ("Raum 017") via the mDNS
+            // TXT record. Both have to be reduced to the same canonical form
+            // — otherwise an already-connected client keeps re-toasting forever.
+            // Use ClassroomLaptopName.Classify(...) parsed Room+DeviceIndex tuple
+            // as the comparison key.
+            var connectedKeys = ClientGroups
                 .SelectMany(g => g.Clients)
-                .Select(t => t.RawHostname.Trim().ToLowerInvariant())
+                .Select(t => CanonicalKey(t.RawHostname))
                 .ToHashSet();
 
             var desired = idle
                 .Where(c => !_dismissedAt.ContainsKey(c.InstanceName))
                 .Where(c =>
                 {
-                    var name = (c.FriendlyName ?? c.InstanceName).Trim().ToLowerInvariant();
-                    return !connectedNames.Contains(name);
+                    var key = CanonicalKey(c.FriendlyName ?? c.InstanceName);
+                    return !connectedKeys.Contains(key);
                 })
+                .OrderBy(c => c.InstanceName, StringComparer.OrdinalIgnoreCase) // stable ordering
                 .Take(MaxVisibleNotifications)
                 .ToList();
 
@@ -196,6 +204,29 @@ public partial class HostDashboardViewModel : ObservableObject
     {
         _dismissedAt[vm.InstanceName] = DateTimeOffset.UtcNow;
         IdleClientNotifications.Remove(vm);
+    }
+
+    /// <summary>
+    /// Maps a raw hostname OR a friendly room label down to a stable
+    /// case-insensitive key. Used so a connected tile (raw "HP-KB-017") and an
+    /// idle-client mDNS advertisement (friendly "Raum 017") deduplicate against
+    /// each other.
+    /// </summary>
+    internal static string CanonicalKey(string nameOrFriendly)
+    {
+        if (string.IsNullOrWhiteSpace(nameOrFriendly)) return "";
+        var parsed = ClassroomLaptopName.Classify(nameOrFriendly);
+        if (parsed.Category != LaptopCategory.Sonstige)
+            return $"{parsed.Category}|{parsed.Room}|{parsed.DeviceIndex}";
+
+        // Fallback: the friendly name might already be in "Raum X (Gerät Y)"
+        // form (passed through ClassroomLaptopName.FriendlyName once). Strip
+        // it back to its components by extracting digits.
+        var digits = string.Concat(nameOrFriendly.Where(char.IsDigit));
+        if (!string.IsNullOrEmpty(digits))
+            return $"digits|{digits}";
+
+        return nameOrFriendly.Trim().ToLowerInvariant();
     }
 
     private void OnClientQualityUpdated(ConnectedClient c) =>

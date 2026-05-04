@@ -9,6 +9,7 @@ namespace LiveStreamSound.Shared.Tests;
 /// the UI falls back to showing the raw key which is a terrible user experience
 /// for the teacher during an exam.
 /// </summary>
+[Collection("LocSharedState")]
 public class ConnectionIssueTests
 {
     public static IEnumerable<object[]> NonNoneIssues =>

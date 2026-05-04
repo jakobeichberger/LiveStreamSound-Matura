@@ -67,14 +67,22 @@ public sealed class ControlClient : IAsyncDisposable
         _tcp = new TcpClient { NoDelay = true };
         try
         {
-            await _tcp.ConnectAsync(host, controlPort, ct).ConfigureAwait(false);
+            // Hard-cap the whole connect+HELLO+WELCOME exchange so a half-broken
+            // host (TCP accepts but never responds) can't wedge the reconnect
+            // loop indefinitely. 5 seconds is the worst-case Wi-Fi handshake
+            // budget plus generous slack.
+            using var handshakeTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, handshakeTimeout.Token);
+            var handshakeCt = linked.Token;
+
+            await _tcp.ConnectAsync(host, controlPort, handshakeCt).ConfigureAwait(false);
             _stream = _tcp.GetStream();
             SetState(ControlClientState.Authenticating);
 
             await MessageJson.WriteFrameAsync(_stream,
-                new Hello(code, clientName, DiscoveryConstants.ProtocolVersion), ct);
+                new Hello(code, clientName, DiscoveryConstants.ProtocolVersion), handshakeCt);
 
-            var response = await MessageJson.ReadFrameAsync(_stream, ct);
+            var response = await MessageJson.ReadFrameAsync(_stream, handshakeCt);
             switch (response)
             {
                 case Welcome welcome:
@@ -144,7 +152,17 @@ public sealed class ControlClient : IAsyncDisposable
 
     private void CheckInboundSilence()
     {
+        // Snapshot mutable refs locally so we don't race against ConnectAsync's
+        // assignment of new _tcp / _stream. If the snapshot is stale (the TCP
+        // we close was already replaced) the close-on-disposed-socket is a
+        // no-op; the dangerous case is closing a *different* live socket,
+        // which the State guard prevents because Connected only holds for
+        // the in-flight session.
         if (State != ControlClientState.Connected) return;
+        var snapshotTcp = _tcp;
+        var snapshotStream = _stream;
+        if (snapshotTcp is null) return;
+
         var silenceSeconds = (DateTimeOffset.UtcNow - LastInboundFrameAt).TotalSeconds;
         if (silenceSeconds >= InboundSilenceTimeoutSeconds)
         {
@@ -152,8 +170,8 @@ public sealed class ControlClient : IAsyncDisposable
                 $"No inbound traffic for {silenceSeconds:F1}s — tearing down stale TCP so reconnect can take over");
             // Close underlying socket so the read loop exits. The orchestrator's
             // state-change handler decides whether to reconnect.
-            try { _tcp?.Close(); } catch { }
-            try { _stream?.Close(); } catch { }
+            try { snapshotTcp.Close(); } catch { }
+            try { snapshotStream?.Close(); } catch { }
         }
     }
 
@@ -180,6 +198,12 @@ public sealed class ControlClient : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        // Dispose the watchdog FIRST so a tick mid-Dispose can't observe a
+        // half-torn-down socket and close a freshly-assigned one from a
+        // concurrent ConnectAsync.
+        _pongWatchdog?.Dispose();
+        _pongWatchdog = null;
+
         try { _cts?.Cancel(); } catch { }
         try { _stream?.Close(); } catch { }
         try { _tcp?.Close(); } catch { }
@@ -187,13 +211,14 @@ public sealed class ControlClient : IAsyncDisposable
         {
             try { await _readLoop.ConfigureAwait(false); } catch { }
         }
-        _pongWatchdog?.Dispose();
-        _pongWatchdog = null;
         _stream = null;
         _tcp = null;
         _cts?.Dispose();
         _cts = null;
         _readLoop = null;
         Welcome = null;
+        // Reset silence-tracking so a fast reconnect doesn't see a stale
+        // "last frame at" from the previous connection.
+        LastInboundFrameAt = DateTimeOffset.MinValue;
     }
 }

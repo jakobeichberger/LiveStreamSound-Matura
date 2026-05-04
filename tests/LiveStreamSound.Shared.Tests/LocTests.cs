@@ -1,12 +1,24 @@
+using System.Collections.Concurrent;
 using LiveStreamSound.Shared.Localization;
 
 namespace LiveStreamSound.Shared.Tests;
+
+/// <summary>
+/// xUnit collection that serializes tests touching the global
+/// <see cref="Loc.Instance"/>. Without this, ConnectionIssueTests and LocTests
+/// run in parallel, both subscribe handlers, both flip Language → handler
+/// from one test fires while another is iterating its captured list →
+/// InvalidOperationException ("modified during enumeration").
+/// </summary>
+[CollectionDefinition("LocSharedState", DisableParallelization = true)]
+public sealed class LocSharedStateCollection { }
 
 /// <summary>
 /// Localization dictionary: guards against missing keys, ensures DE/EN parity
 /// for the user-facing strings, and verifies the live toggle fires the
 /// PropertyChanged event WPF data-binding relies on.
 /// </summary>
+[Collection("LocSharedState")]
 public class LocTests
 {
     [Fact]
@@ -69,30 +81,44 @@ public class LocTests
     public void LanguageChange_FiresPropertyChanged_ForBindings()
     {
         var prev = Loc.Instance.Language;
+        // ConcurrentBag in case a different test still has a leaked subscription
+        // hammering the event during this test's lifetime.
+        var fired = new ConcurrentBag<string>();
+        System.ComponentModel.PropertyChangedEventHandler handler =
+            (_, e) => { if (e.PropertyName is not null) fired.Add(e.PropertyName); };
+        Loc.Instance.PropertyChanged += handler;
         try
         {
-            var fired = new List<string>();
-            Loc.Instance.PropertyChanged += (_, e) => fired.Add(e.PropertyName!);
-
             Loc.Instance.Language = prev == Loc.Lang.German ? Loc.Lang.English : Loc.Lang.German;
 
+            var snapshot = fired.ToArray();
             // "Item[]" is the wildcard signal for XAML bindings that use the indexer.
-            Assert.Contains("Item[]", fired);
-            Assert.Contains("Language", fired);
-            Assert.Contains("IsGerman", fired);
-            Assert.Contains("IsEnglish", fired);
+            Assert.Contains("Item[]", snapshot);
+            Assert.Contains("Language", snapshot);
+            Assert.Contains("IsGerman", snapshot);
+            Assert.Contains("IsEnglish", snapshot);
         }
-        finally { Loc.Instance.Language = prev; }
+        finally
+        {
+            // Always unsubscribe so we don't leak the handler into other tests.
+            Loc.Instance.PropertyChanged -= handler;
+            Loc.Instance.Language = prev;
+        }
     }
 
     [Fact]
     public void LanguageChange_ToSameValue_DoesNotFire()
     {
         var fired = 0;
-        Loc.Instance.PropertyChanged += (_, _) => fired++;
-        var current = Loc.Instance.Language;
-        Loc.Instance.Language = current; // no-op
-        Assert.Equal(0, fired);
+        System.ComponentModel.PropertyChangedEventHandler handler = (_, _) => Interlocked.Increment(ref fired);
+        Loc.Instance.PropertyChanged += handler;
+        try
+        {
+            var current = Loc.Instance.Language;
+            Loc.Instance.Language = current; // no-op
+            Assert.Equal(0, fired);
+        }
+        finally { Loc.Instance.PropertyChanged -= handler; }
     }
 
     [Theory]

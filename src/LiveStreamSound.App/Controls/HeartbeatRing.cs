@@ -49,7 +49,19 @@ public sealed class HeartbeatRing : Grid
         Children.Add(_core);
 
         Loaded += (_, _) => ApplyAnimationFor(Level);
-        Unloaded += (_, _) => _activeStoryboard?.Stop();
+        Unloaded += (_, _) => StopAndDetachStoryboard();
+    }
+
+    private void StopAndDetachStoryboard()
+    {
+        if (_activeStoryboard is null) return;
+        try
+        {
+            _activeStoryboard.Stop(this);
+            _activeStoryboard.Remove(this);
+        }
+        catch { /* best-effort cleanup */ }
+        _activeStoryboard = null;
     }
 
     private static Ellipse NewRing(double size, bool fill)
@@ -74,7 +86,11 @@ public sealed class HeartbeatRing : Grid
 
     private void ApplyAnimationFor(QualityLevel level)
     {
-        _activeStoryboard?.Stop();
+        // Stop AND remove the previous storyboard from the timing tree so its
+        // clocks aren't leaked. `Stop()` alone halts the animation but keeps
+        // the clocks attached, accumulating per-target overhead on every
+        // Level change (visible perf degradation on flapping connections).
+        StopAndDetachStoryboard();
 
         var (color, periodSec, pulseScale) = level switch
         {
@@ -114,7 +130,9 @@ public sealed class HeartbeatRing : Grid
         AddOpacityPulse(sb, _ring2, 0.4, 0.0, periodSec, beginOffset: periodSec / 3);
 
         _activeStoryboard = sb;
-        sb.Begin();
+        // Begin with isControllable=true so we can call Stop+Remove later
+        // and detach the clocks. Without this flag, Remove is a no-op.
+        sb.Begin(this, isControllable: true);
     }
 
     private static void AddPulse(Storyboard sb, DependencyObject target, string path,

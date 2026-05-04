@@ -27,6 +27,7 @@ public sealed class UserSettingsService
     };
 
     private readonly string _path;
+    private readonly SemaphoreSlim _saveLock = new(1, 1);
     public UserSettings Current { get; private set; } = new();
 
     public UserSettingsService()
@@ -55,15 +56,30 @@ public sealed class UserSettingsService
         }
     }
 
+    /// <summary>
+    /// Atomic save: write to a sibling .tmp file, then File.Move over the
+    /// target. On NTFS this is atomic on the same volume — a crash mid-write
+    /// can never produce a half-truncated settings file.
+    /// </summary>
     public void Save()
     {
+        _saveLock.Wait();
         try
         {
-            File.WriteAllText(_path, JsonSerializer.Serialize(Current, JsonOpts));
+            var tmp = _path + ".tmp";
+            File.WriteAllText(tmp, JsonSerializer.Serialize(Current, JsonOpts));
+            // Move with overwrite (NTFS atomic on same volume).
+            File.Move(tmp, _path, overwrite: true);
         }
         catch
         {
             // Settings persistence is best-effort; failure shouldn't crash the app.
+            // Cleanup any leftover tmp file.
+            try { if (File.Exists(_path + ".tmp")) File.Delete(_path + ".tmp"); } catch { }
+        }
+        finally
+        {
+            _saveLock.Release();
         }
     }
 }

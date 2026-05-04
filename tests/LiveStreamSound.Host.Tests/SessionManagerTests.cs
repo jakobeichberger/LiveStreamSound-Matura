@@ -384,6 +384,55 @@ public class SessionManagerTests
         Assert.Null(sm.GetClient("does-not-exist"));
     }
 
+    // Regression: bug #8 — AudioEndpoint should be cleared on FinalizeRejoin so
+    // the audio broadcast doesn't keep streaming to a stale IP/port for the
+    // first second after the client roamed APs.
+    [Fact]
+    public void FinalizeRejoin_ClearsAudioEndpoint_SoBroadcastWaitsForAudioClientReady()
+    {
+        using var sm = new SessionManager(NewLog());
+        sm.StartSession();
+        var client = NewClient("Raum 17");
+        client.AudioEndpoint = new IPEndPoint(IPAddress.Parse("10.0.0.99"), 12345);
+        sm.RegisterClient(client);
+        sm.UnregisterClient(client.ClientId);
+
+        sm.FinalizeRejoin(client);
+        Assert.Null(client.AudioEndpoint);
+
+        // ActiveClients filter still works (rejoined client is in it)
+        Assert.Contains(client, sm.ActiveClients);
+    }
+
+    // Regression: bug #6 — sweep timer must not fire after StopSession.
+    // We can't observe the live timer easily in a unit test, but we can
+    // prove that the sweep method itself is a no-op once the session is
+    // stopped (no ClientLeft fired even with an "expired" reconnect entry).
+    [Fact]
+    public void Sweep_AfterStopSession_DoesNotFireClientLeft()
+    {
+        using var sm = new SessionManager(NewLog()) { RejoinGracePeriod = TimeSpan.FromSeconds(1) };
+        sm.StartSession();
+        var c = NewClient("Raum 17");
+        sm.RegisterClient(c);
+        sm.UnregisterClient(c.ClientId);
+        c.ReconnectingSince = DateTimeOffset.UtcNow - TimeSpan.FromMinutes(5);
+
+        sm.StopSession();
+
+        ConnectedClient? left = null;
+        sm.ClientLeft += x => left = x;
+
+        var sweep = typeof(SessionManager).GetMethod("SweepExpiredReconnects",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+        sweep.Invoke(sm, null);
+
+        // After StopSession the dict is empty, so sweep can't find anything
+        // to expire — most importantly, no ghost ClientLeft event fires
+        // after the session is gone.
+        Assert.Null(left);
+    }
+
     [Fact]
     public void SessionStateChanged_FiresOnStartAndStop()
     {
