@@ -228,8 +228,29 @@ public sealed class ControlServer : IAsyncDisposable
 
             var serverTimeMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             var saltHex = _sessions.SessionSaltHex;
-            var crypto = _sessions.Crypto
-                ?? throw new InvalidOperationException("Crypto not initialised after StartSession");
+            var crypto = _sessions.Crypto;
+
+            // Defensive: if crypto somehow isn't ready yet (race between
+            // StartSession() and the listener accepting), surface a clear
+            // AUTH_FAILED to the client so they see a real error message
+            // instead of an EOF that would be reported as
+            // UNEXPECTED_RESPONSE / HOST_CLOSED_PREMATURELY.
+            if (crypto is null || string.IsNullOrEmpty(saltHex))
+            {
+                _log.Error("ControlServer",
+                    $"{remote}: session crypto not ready " +
+                    $"(IsActive={_sessions.IsActive}, saltHex='{saltHex}', " +
+                    $"crypto={(crypto is null ? "null" : "ok")}). " +
+                    $"This is a bug — sending AUTH_FAILED so the client surfaces a real error.");
+                try
+                {
+                    await MessageJson.WriteFrameAsync(stream,
+                        new AuthFail("SERVER_CRYPTO_NOT_READY"), ct);
+                }
+                catch { }
+                return;
+            }
+
             var canonical = SessionCrypto.CanonicalWelcomeBytes(
                 registered.ClientId, AudioPort, AudioFormat.SampleRate,
                 AudioFormat.Channels, "opus", serverTimeMs, saltHex);
@@ -244,6 +265,13 @@ public sealed class ControlServer : IAsyncDisposable
                 ServerTimeMs: serverTimeMs,
                 SessionSaltHex: saltHex,
                 WelcomeMacHex: welcomeMacHex);
+
+            // Debug-log the WELCOME we're about to send (helpful when chasing
+            // mac-mismatch reports). Session code itself is NOT logged.
+            _log.Debug("ControlServer",
+                $"Sending WELCOME to {remote}: clientId={registered.ClientId} " +
+                $"audioPort={AudioPort} saltHex={saltHex} macHex={welcomeMacHex}");
+
             await SendOnStreamAsync(registered, stream, welcome, ct);
 
             // For a rejoin: push the preserved volume/mute/device back down so
