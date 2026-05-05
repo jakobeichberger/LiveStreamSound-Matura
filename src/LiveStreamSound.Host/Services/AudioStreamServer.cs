@@ -37,8 +37,11 @@ public sealed class AudioStreamServer : IDisposable
                 var u = new UdpClient(candidate);
                 u.Client.SendBufferSize = 1 << 18;
                 _udp = u;
-                Port = candidate;
-                _log.Info("AudioStreamServer", $"UDP audio server on port {candidate}");
+                // Read the ACTUAL bound port — when preferredPort is 0
+                // (OS-assigned ephemeral), `candidate` is 0 too and would
+                // be a useless port number. LocalEndPoint works for both.
+                Port = ((IPEndPoint)u.Client.LocalEndPoint!).Port;
+                _log.Info("AudioStreamServer", $"UDP audio server on port {Port}");
             }
             catch (SocketException ex) { lastEx = ex; }
         }
