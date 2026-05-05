@@ -166,9 +166,15 @@
                        Key="Software\LiveStreamSound"
                        Name="eventlog_registered"
                        Type="integer" Value="1" KeyPath="yes" />
+        <!--
+          Use [System64Folder] (= C:\Windows\System32 on 64-bit Windows) rather
+          than [SystemFolder] (= SysWoW64 / 32-bit on a 64-bit OS) — the MSI is
+          marked perMachine + 64-bit (Files install to ProgramFiles64Folder), so
+          ICE80 rightly flags a 32-bit path inside a 64-bit Component.
+        -->
         <util:EventSource Name="LiveStreamSound"
                           Log="LiveStreamSound"
-                          EventMessageFile="[SystemFolder]EventCreate.exe" />
+                          EventMessageFile="[System64Folder]EventCreate.exe" />
       </Component>
     </ComponentGroup>
 
