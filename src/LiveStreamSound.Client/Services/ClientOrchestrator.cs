@@ -62,21 +62,63 @@ public sealed class ClientOrchestrator : IAsyncDisposable
 
     public ClientOrchestrator()
     {
-        Log = new LogService();
-        Discovery = new MDnsDiscoveryService(Log);
-        Control = new ControlClient(Log);
-        ClockSync = new ClockSyncService();
-        Decoder = new OpusDecoderService();
-        Buffer = new SyncBuffer(ClockSync);
-        AudioIn = new AudioStreamClient(Decoder, Buffer, Log);
-        Playback = new AudioPlaybackService(Log);
-        Diagnostics = new ClientDiagnosticsService(Control, AudioIn, Buffer, ClockSync);
-        IdleListener = new IdleListenerService(Log);
+        // Granular construction with per-step emergency log — see HostOrchestrator
+        // for the rationale. Without this, "click → nothing happens" gives us
+        // zero info about which service is the culprit.
+        var step = "(start)";
+        try
+        {
+            step = "LogService";              EmergencyLog($"ClientOrchestrator: starting {step}");
+            Log = new LogService();
+            step = "MDnsDiscoveryService";    EmergencyLog($"ClientOrchestrator: starting {step}");
+            Discovery = new MDnsDiscoveryService(Log);
+            step = "ControlClient";           EmergencyLog($"ClientOrchestrator: starting {step}");
+            Control = new ControlClient(Log);
+            step = "ClockSyncService";        EmergencyLog($"ClientOrchestrator: starting {step}");
+            ClockSync = new ClockSyncService();
+            step = "OpusDecoderService";      EmergencyLog($"ClientOrchestrator: starting {step}");
+            Decoder = new OpusDecoderService();
+            step = "SyncBuffer";              EmergencyLog($"ClientOrchestrator: starting {step}");
+            Buffer = new SyncBuffer(ClockSync);
+            step = "AudioStreamClient";       EmergencyLog($"ClientOrchestrator: starting {step}");
+            AudioIn = new AudioStreamClient(Decoder, Buffer, Log);
+            step = "AudioPlaybackService";    EmergencyLog($"ClientOrchestrator: starting {step}");
+            Playback = new AudioPlaybackService(Log);
+            step = "ClientDiagnosticsService"; EmergencyLog($"ClientOrchestrator: starting {step}");
+            Diagnostics = new ClientDiagnosticsService(Control, AudioIn, Buffer, ClockSync);
+            step = "IdleListenerService";     EmergencyLog($"ClientOrchestrator: starting {step}");
+            IdleListener = new IdleListenerService(Log);
+            step = "FriendlyName";            EmergencyLog($"ClientOrchestrator: starting {step}");
+            SuggestedDisplayName = ClassroomLaptopName.FriendlyName(HostName);
+            step = "WireEvents";              EmergencyLog($"ClientOrchestrator: starting {step}");
 
-        SuggestedDisplayName = ClassroomLaptopName.FriendlyName(HostName);
+            Control.MessageReceived += OnMessage;
+            Control.StateChanged += OnStateChanged;
 
-        Control.MessageReceived += OnMessage;
-        Control.StateChanged += OnStateChanged;
+            EmergencyLog("ClientOrchestrator: all services constructed OK");
+        }
+        catch (Exception ex)
+        {
+            EmergencyLog($"ClientOrchestrator: FAILED at step '{step}'", ex);
+            throw new InvalidOperationException(
+                $"Client service '{step}' failed to construct: {ex.Message}", ex);
+        }
+    }
+
+    private static void EmergencyLog(string message, Exception? ex = null)
+    {
+        try
+        {
+            var dir = System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "LiveStreamSound", "crashes");
+            System.IO.Directory.CreateDirectory(dir);
+            var path = System.IO.Path.Combine(dir, $"emergency-{DateTime.Now:yyyy-MM-dd}.log");
+            var line = $"{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss.fff} {message}";
+            if (ex is not null) line += Environment.NewLine + ex.ToString();
+            System.IO.File.AppendAllText(path, line + Environment.NewLine);
+        }
+        catch { /* never throw from emergency logger */ }
     }
 
     /// <summary>Start listening for host invitations on TCP 5002 and advertising via mDNS.</summary>
