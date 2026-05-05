@@ -102,13 +102,22 @@ Libraries (Shared/Host/Client) use `EnableWindowsTargeting=true`, so `dotnet res
 
 The MSI artifact installs cleanly on a freshly imaged Windows PC without a separate .NET 10 install.
 
-### Versioning
+### Versioning — fully automatic via Conventional Commits
 
-Version is derived from the latest git tag **plus commits-since-tag** — so every commit produces a unique MSI build, even without a fresh tag:
-- Tag `v0.4.0` exactly at HEAD → MSI version `0.4.0.0`
-- Tag `v0.4.0`, 5 commits later → MSI version `0.4.0.5`
-- Tag `v1.0.0-beta.1`, 12 commits later → MSI version `1.0.0.12` (pre-release suffix is stripped)
-- No tag in repo → `0.0.0.<HEAD-commit-count>` fallback
+On every push to `main`, the [`auto-tag-on-merge.yml`](.github/workflows/auto-tag-on-merge.yml) workflow creates a new git tag based on the **commit message convention**:
+
+| Commit message (PR title on squash-merge) | Bump | Example |
+|---|---|---|
+| `feat: …` or `feat(scope): …` | **minor** | `0.4.0` → `0.5.0` |
+| `feat!: …` or `BREAKING CHANGE:` in body | **major** | `0.4.0` → `1.0.0` |
+| `fix: …`, `chore: …`, `docs: …`, anything else | **patch** | `0.4.0` → `0.4.1` |
+| Skip — include `[skip tag]` anywhere in the message | (no tag) | unchanged |
+
+The Build-MSI workflow then uses the tag as the MSI version (`v0.4.1` → MSI `0.4.1.0`). Plus: a manual run **between two tags** uses `commits-since-tag` as the 4th component for a unique build (`0.4.1.7`).
+
+**Manual tags override the auto-bump** — if you `git tag v1.0.0 && git push --tags` yourself, the auto-tagger leaves the existing tag alone.
+
+**Force a major bump:** put `feat!:` in the PR title, or add a `BREAKING CHANGE: …` line in the PR body. Squash-merge carries it through.
 
 **Publish a new version:**
 ```bash

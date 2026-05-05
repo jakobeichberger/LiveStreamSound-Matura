@@ -104,13 +104,22 @@ Der Workflow [.github/workflows/build-msi-on-demand.yml](.github/workflows/build
 
 Der MSI-Artifact kann direkt auf einen frischen Windows-PC gespielt werden — kein separates .NET 10 nötig.
 
-### Versionierung
+### Versionierung — voll automatisch via Conventional Commits
 
-Die Version wird aus letztem Git-Tag **plus commits-seit-Tag** abgeleitet — so produziert jeder Commit auch ohne neuen Tag einen unique MSI-Build:
-- Tag `v0.4.0` exakt am HEAD → MSI-Version `0.4.0.0`
-- Tag `v0.4.0`, 5 Commits später → MSI-Version `0.4.0.5`
-- Tag `v1.0.0-beta.1`, 12 Commits später → MSI-Version `1.0.0.12` (Pre-Release-Suffix wird gestrippt)
-- Kein Tag im Repo → `0.0.0.<HEAD-commit-count>` als Fallback
+Bei jedem Push auf `main` läuft der Workflow [`auto-tag-on-merge.yml`](.github/workflows/auto-tag-on-merge.yml) der einen neuen Git-Tag basierend auf der **Commit-Message-Konvention** anlegt:
+
+| Commit-Message (PR-Titel beim Squash-Merge) | Bump | Beispiel |
+|---|---|---|
+| `feat: …` oder `feat(scope): …` | **minor** | `0.4.0` → `0.5.0` |
+| `feat!: …` oder `BREAKING CHANGE:` im Body | **major** | `0.4.0` → `1.0.0` |
+| `fix: …`, `chore: …`, `docs: …`, sonst alles | **patch** | `0.4.0` → `0.4.1` |
+| Skip — `[skip tag]` irgendwo in der Message | (kein Tag) | bleibt unverändert |
+
+Der Build-MSI-Workflow nutzt den Tag dann als MSI-Version (`v0.4.1` → MSI `0.4.1.0`). Plus: bei manuellem Run **zwischen zwei Tags** liefert das `commits-since-tag` als 4. Komponente einen unique Build (`0.4.1.7`).
+
+**Manuelle Tags überschreiben den Auto-Bump nicht** — wenn du `git tag v1.0.0 && git push --tags` selbst machst, lässt der Auto-Tagger den existierenden Tag in Ruhe.
+
+**Major-Bump erzwingen:** im PR-Titel `feat!:` schreiben oder im Body eine Zeile `BREAKING CHANGE: …` einfügen. Der Squash-Merge übernimmt das.
 
 **Neue Version veröffentlichen:**
 ```bash
