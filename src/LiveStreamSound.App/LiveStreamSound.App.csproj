@@ -32,6 +32,27 @@
     <Content Include="Assets\app.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <!--
+      Ship LICENSE + THIRD_PARTY_LICENSES + Notfall-Plan alongside the binary
+      so the MSI carries them into Program Files, the WiX wildcard
+      <Files Include="$(AppPublishDir)**" /> picks them up automatically,
+      and uninstall removes them cleanly. Required for license compliance
+      (NAudio MS-PL, Concentus BSD-3 etc.) when redistributing on locked-
+      down school AD environments where the user can't reach the GitHub
+      repo to view the licenses online.
+    -->
+    <Content Include="..\..\LICENSE" Link="LICENSE">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="..\..\THIRD_PARTY_LICENSES.txt" Link="THIRD_PARTY_LICENSES.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="..\..\docs\Notfall-Plan.md" Link="docs\Notfall-Plan.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>
