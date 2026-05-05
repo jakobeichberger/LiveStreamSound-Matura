@@ -113,7 +113,7 @@ Bei jedem Push auf `main` läuft der Workflow [`auto-tag-on-merge.yml`](.github/
 | `feat: …` oder `feat(scope): …` | **minor** | `0.4.0` → `0.5.0` |
 | `feat!: …` oder `BREAKING CHANGE:` im Body | **major** | `0.4.0` → `1.0.0` |
 | `fix: …`, `chore: …`, `docs: …`, sonst alles | **patch** | `0.4.0` → `0.4.1` |
-| Skip — `[skip tag]` irgendwo in der Message | (kein Tag) | bleibt unverändert |
+| Skip — `[skip tag]` in der **ersten Zeile** des Commits | (kein Tag) | bleibt unverändert |
 
 Der Build-MSI-Workflow nutzt den Tag dann als MSI-Version (`v0.4.1` → MSI `0.4.1.0`). Plus: bei manuellem Run **zwischen zwei Tags** liefert das `commits-since-tag` als 4. Komponente einen unique Build (`0.4.1.7`).
 
