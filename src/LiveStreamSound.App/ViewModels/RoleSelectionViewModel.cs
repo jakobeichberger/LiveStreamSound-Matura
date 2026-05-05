@@ -17,10 +17,22 @@ public partial class RoleSelectionViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void ChooseHost() => AppShell.Current.EnterHostMode();
+    private void ChooseHost()
+    {
+        // Emergency-log entry proves the click reached the VM. If this line
+        // doesn't appear in the log file but the user reports clicking,
+        // the binding from the CardAction button to ChooseHostCommand is
+        // broken (likely a XAML resource error in RoleSelectionWindow).
+        EmergencyLog.Write("RoleSelectionViewModel.ChooseHost — command received from button");
+        AppShell.Current.EnterHostMode();
+    }
 
     [RelayCommand]
-    private void ChooseClient() => AppShell.Current.EnterClientMode();
+    private void ChooseClient()
+    {
+        EmergencyLog.Write("RoleSelectionViewModel.ChooseClient — command received from button");
+        AppShell.Current.EnterClientMode();
+    }
 
     [RelayCommand] private void ToggleLanguage() => Loc.Instance.Toggle();
 

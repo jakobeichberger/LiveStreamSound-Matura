@@ -87,21 +87,11 @@ public sealed class AppShell
     /// user just sees "click does nothing". This file is the first place to
     /// look when the app silently refuses to start a role.
     /// </summary>
-    private static void EmergencyLog(string message, Exception? ex = null)
-    {
-        try
-        {
-            var dir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "LiveStreamSound", "crashes");
-            Directory.CreateDirectory(dir);
-            var path = Path.Combine(dir, $"emergency-{DateTime.Now:yyyy-MM-dd}.log");
-            var line = $"{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss.fff} {message}";
-            if (ex is not null) line += Environment.NewLine + ex.ToString();
-            File.AppendAllText(path, line + Environment.NewLine);
-        }
-        catch { /* never throw from emergency logger */ }
-    }
+    // Forwarder so existing call sites here (EmergencyLog("...")) continue
+    // to compile while the actual implementation lives in
+    // <see cref="EmergencyLog"/> (also called from ViewModels + orchestrators).
+    private static void EmergencyLog(string message, Exception? ex = null) =>
+        Services.EmergencyLog.Write(message, ex);
 
     private static void ShowFailureMessageBox(string roleName, Exception ex)
     {
@@ -141,13 +131,35 @@ public sealed class AppShell
 
     private void SwapTo(Func<Window> factory)
     {
-        var newWindow = factory();
-        newWindow.Show();
+        EmergencyLog($"SwapTo: invoking factory to construct new window");
+        Window newWindow;
+        try { newWindow = factory(); }
+        catch (Exception ex)
+        {
+            EmergencyLog("SwapTo: factory() threw — window construction failed", ex);
+            throw;
+        }
+        EmergencyLog($"SwapTo: factory returned window of type {newWindow.GetType().Name}");
+
+        try { newWindow.Show(); }
+        catch (Exception ex)
+        {
+            EmergencyLog("SwapTo: newWindow.Show() threw", ex);
+            throw;
+        }
+        EmergencyLog("SwapTo: newWindow.Show() completed — window should now be visible");
+
         var old = _currentWindow;
         _currentWindow = newWindow;
         // Defer close to avoid flicker
-        old?.Dispatcher.BeginInvoke(() => old.Close());
+        old?.Dispatcher.BeginInvoke(() =>
+        {
+            EmergencyLog($"SwapTo: closing previous window {old.GetType().Name}");
+            try { old.Close(); }
+            catch (Exception ex) { EmergencyLog("SwapTo: old.Close() threw", ex); }
+        });
         Application.Current.MainWindow = newWindow;
+        EmergencyLog($"SwapTo: done — MainWindow is now {newWindow.GetType().Name}");
     }
 
     public bool HasActiveSession =>
