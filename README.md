@@ -106,10 +106,11 @@ Der MSI-Artifact kann direkt auf einen frischen Windows-PC gespielt werden — k
 
 ### Versionierung
 
-Die Version wird aus dem letzten Git-Tag abgeleitet, z.B.:
-- Tag `v0.3.0` → MSI-Version `0.3.0.0`, Artifact `LiveStreamSound-MSI-v0.3.0.0`
-- Tag `v1.0.0-beta.1` → MSI-Version `1.0.0.0` (Pre-Release-Suffix wird für MSI gestrippt)
-- Kein Tag → `v0.2.0` als Fallback
+Die Version wird aus letztem Git-Tag **plus commits-seit-Tag** abgeleitet — so produziert jeder Commit auch ohne neuen Tag einen unique MSI-Build:
+- Tag `v0.4.0` exakt am HEAD → MSI-Version `0.4.0.0`
+- Tag `v0.4.0`, 5 Commits später → MSI-Version `0.4.0.5`
+- Tag `v1.0.0-beta.1`, 12 Commits später → MSI-Version `1.0.0.12` (Pre-Release-Suffix wird gestrippt)
+- Kein Tag im Repo → `0.0.0.<HEAD-commit-count>` als Fallback
 
 **Neue Version veröffentlichen:**
 ```bash
