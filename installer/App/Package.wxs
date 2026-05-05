@@ -10,9 +10,17 @@
            UpgradeCode="7E4D2F11-19B8-4F9F-9A0D-33B1C2F1A010"
            Scope="perMachine"
            Compressed="yes"
-           InstallerVersion="500"
-           Description="Kabellose Audio-Verteilung für Matura-Prüfungen — eine App, beim Start wählst du senden oder empfangen."
-           Keywords="Audio; Streaming; Matura; WPF; LiveStreamSound">
+           InstallerVersion="500">
+
+    <!--
+      MSI Summary-Information stream — Description + Keywords show up in
+      Explorer's "Details" tab on the .msi file and in some Add/Remove
+      Programs implementations. In WiX 5 these attributes live on
+      <SummaryInformation /> rather than on <Package /> itself (WiX0004).
+    -->
+    <SummaryInformation
+      Description="Kabellose Audio-Verteilung für Matura-Prüfungen — eine App, beim Start wählst du senden oder empfangen."
+      Keywords="Audio; Streaming; Matura; WPF; LiveStreamSound" />
 
     <!--
       MajorUpgrade behaviour:
