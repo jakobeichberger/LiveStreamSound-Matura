@@ -40,31 +40,76 @@ public sealed class HostOrchestrator : IAsyncDisposable
 
     public HostOrchestrator()
     {
-        Log = new LogService();
-        Pipeline = new AudioPipelineState();
-        Sessions = new SessionManager(Log);
-        Control = new ControlServer(Sessions, Log);
-        AudioServer = new AudioStreamServer(Sessions, Log);
-        Capture = new AudioCaptureService();
-        Encoder = new OpusEncoderService();
-        MDns = new MDnsAdvertiseService(Log);
-        Diagnostics = new DiagnosticsService(Sessions, Pipeline, Log);
-        IdleClientDiscovery = new IdleClientDiscoveryService(Log);
-        InviteClient = new InviteClientService(Log);
-        MonitorMute = new HostMonitorMuteService(Log);
-        TestTone = new TestToneService(Log);
+        // Granular construction with per-step emergency logging — when the
+        // app silently refuses to enter Host mode we need to know EXACTLY
+        // which service failed. Without this, a single throw anywhere in the
+        // chain just leaves "click does nothing" with no visible trace.
+        var step = "(start)";
+        try
+        {
+            step = "LogService";              EmergencyLog($"HostOrchestrator: starting {step}");
+            Log = new LogService();
+            step = "AudioPipelineState";      EmergencyLog($"HostOrchestrator: starting {step}");
+            Pipeline = new AudioPipelineState();
+            step = "SessionManager";          EmergencyLog($"HostOrchestrator: starting {step}");
+            Sessions = new SessionManager(Log);
+            step = "ControlServer";           EmergencyLog($"HostOrchestrator: starting {step}");
+            Control = new ControlServer(Sessions, Log);
+            step = "AudioStreamServer";       EmergencyLog($"HostOrchestrator: starting {step}");
+            AudioServer = new AudioStreamServer(Sessions, Log);
+            step = "AudioCaptureService";     EmergencyLog($"HostOrchestrator: starting {step}");
+            Capture = new AudioCaptureService();
+            step = "OpusEncoderService";      EmergencyLog($"HostOrchestrator: starting {step}");
+            Encoder = new OpusEncoderService();
+            step = "MDnsAdvertiseService";    EmergencyLog($"HostOrchestrator: starting {step}");
+            MDns = new MDnsAdvertiseService(Log);
+            step = "DiagnosticsService";      EmergencyLog($"HostOrchestrator: starting {step}");
+            Diagnostics = new DiagnosticsService(Sessions, Pipeline, Log);
+            step = "IdleClientDiscovery";     EmergencyLog($"HostOrchestrator: starting {step}");
+            IdleClientDiscovery = new IdleClientDiscoveryService(Log);
+            step = "InviteClientService";     EmergencyLog($"HostOrchestrator: starting {step}");
+            InviteClient = new InviteClientService(Log);
+            step = "HostMonitorMuteService";  EmergencyLog($"HostOrchestrator: starting {step}");
+            MonitorMute = new HostMonitorMuteService(Log);
+            step = "TestToneService";         EmergencyLog($"HostOrchestrator: starting {step}");
+            TestTone = new TestToneService(Log);
+            step = "WireFrameAvailable";      EmergencyLog($"HostOrchestrator: starting {step}");
 
-        Capture.FrameAvailable += OnPcmFrame;
-        // The test-tone service feeds synthesized frames straight through the
-        // same encode + broadcast path so a teacher can verify "is this client
-        // hearing me?" without launching VLC.
-        TestTone.FrameAvailable += OnPcmFrame;
-        Capture.CaptureError += ex => Log.Error("Capture", "Recording error", ex);
-        // NOTE: the client sends AudioClientReady over TCP with its actual bound
-        // UDP port after HELLO. That message updates client.AudioEndpoint with
-        // the right endpoint. We no longer assume DefaultAudioPort here so a
-        // host and client can run on the same machine without colliding on 5001.
-        Control.ClientStatusReceived += (c, _) => { /* placeholder subscription */ };
+            Capture.FrameAvailable += OnPcmFrame;
+            // The test-tone service feeds synthesized frames straight through the
+            // same encode + broadcast path so a teacher can verify "is this client
+            // hearing me?" without launching VLC.
+            TestTone.FrameAvailable += OnPcmFrame;
+            Capture.CaptureError += ex => Log.Error("Capture", "Recording error", ex);
+            // NOTE: the client sends AudioClientReady over TCP with its actual bound
+            // UDP port after HELLO. That message updates client.AudioEndpoint with
+            // the right endpoint.
+            Control.ClientStatusReceived += (c, _) => { /* placeholder subscription */ };
+
+            EmergencyLog("HostOrchestrator: all services constructed OK");
+        }
+        catch (Exception ex)
+        {
+            EmergencyLog($"HostOrchestrator: FAILED at step '{step}'", ex);
+            throw new InvalidOperationException(
+                $"Host service '{step}' failed to construct: {ex.Message}", ex);
+        }
+    }
+
+    private static void EmergencyLog(string message, Exception? ex = null)
+    {
+        try
+        {
+            var dir = System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "LiveStreamSound", "crashes");
+            System.IO.Directory.CreateDirectory(dir);
+            var path = System.IO.Path.Combine(dir, $"emergency-{DateTime.Now:yyyy-MM-dd}.log");
+            var line = $"{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss.fff} {message}";
+            if (ex is not null) line += Environment.NewLine + ex.ToString();
+            System.IO.File.AppendAllText(path, line + Environment.NewLine);
+        }
+        catch { /* never throw from emergency logger */ }
     }
 
     public string StartSession(string? sessionName = null)
