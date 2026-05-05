@@ -199,5 +199,13 @@
     </ComponentGroup>
 
     <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+
+    <!--
+      Replace the WiX-default empty/placeholder license dialog text with a
+      proper German license RTF. Without this override the user sees a
+      blank or Lorem-ipsum-style license page during install which looks
+      unprofessional in a school deployment.
+    -->
+    <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
   </Package>
 </Wix>
