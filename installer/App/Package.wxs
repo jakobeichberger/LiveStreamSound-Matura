@@ -57,9 +57,13 @@
     <Property Id="ARPCONTACT" Value="jakob@eichberger.tech" />
     <Property Id="ARPCOMMENTS" Value="Synchrone Audio-Verteilung über LAN/WLAN für Matura-Prüfungsräume. Eine Anwendung deckt beide Rollen (Host + Client) über einen Start-Screen ab." />
     <Property Id="ARPSIZE" Value="100000" /><!-- approximate KB to avoid 0 on first install -->
-    <!-- Installation allowed in change/remove mode but not in "Modify" (no feature
-         tree). Uninstall works normally. -->
-    <Property Id="ARPNOMODIFY" Value="1" />
+    <!--
+      ARPNOMODIFY (no "Modify" / "Change" entry in Add/Remove Programs since
+      we have a single feature tree) is set automatically by the WixUI_InstallDir
+      wixlib referenced via <ui:WixUI Id="WixUI_InstallDir" .../> at the bottom
+      of this file. Declaring it explicitly here would conflict (WIX0091) so we
+      let the UI library own it.
+    -->
 
     <Feature Id="Main" Title="LiveStreamSound" Level="1"
              Description="Die LiveStreamSound-Anwendung mit allen Abhängigkeiten, Start-Menü, Desktop-Shortcut, Firewall-Regeln und Windows-Ereignis-Log-Quelle.">
