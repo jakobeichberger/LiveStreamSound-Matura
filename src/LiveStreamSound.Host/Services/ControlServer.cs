@@ -49,8 +49,12 @@ public sealed class ControlServer : IAsyncDisposable
                 var listener = new TcpListener(IPAddress.Any, candidate);
                 listener.Start();
                 _listener = listener;
-                Port = candidate;
-                _log.Info("ControlServer", $"Listening on TCP {candidate}");
+                // Read the ACTUAL bound port from the listener's endpoint —
+                // when preferredPort is 0 (caller wants OS-assigned ephemeral),
+                // `candidate` is also 0 and would be a useless return value.
+                // Reading LocalEndpoint works for both cases.
+                Port = ((IPEndPoint)listener.LocalEndpoint).Port;
+                _log.Info("ControlServer", $"Listening on TCP {Port}");
             }
             catch (System.Net.Sockets.SocketException ex)
             {
