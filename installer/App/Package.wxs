@@ -14,7 +14,27 @@
            Description="Kabellose Audio-Verteilung für Matura-Prüfungen — eine App, beim Start wählst du senden oder empfangen."
            Keywords="Audio; Streaming; Matura; WPF; LiveStreamSound">
 
-    <MajorUpgrade DowngradeErrorMessage="Eine neuere Version von !(bind.Property.ProductName) ist bereits installiert." />
+    <!--
+      MajorUpgrade behaviour:
+      - Schedule = afterInstallInitialize (default) → old version is fully
+        uninstalled BEFORE the new version installs. All component-tracked
+        files, registry entries, firewall rules, EventSource and WER dump
+        keys are removed and re-added. This is the cleanest possible swap
+        — no stale DLLs from the previous version can persist.
+      - AllowSameVersionUpgrades="yes" lets the installer treat a re-install
+        of the SAME version as an upgrade (i.e. uninstall old → install
+        new). Without this, "msiexec /i LiveStreamSound.msi" on an existing
+        same-version install produces "already installed, no changes made"
+        which is unhelpful when iterating on bugfixes within one version.
+      - DowngradeErrorMessage prevents an accidental "newer version is
+        already installed → install older anyway" disaster.
+
+      User data (logs in %LOCALAPPDATA%, settings.json) is NEVER touched by
+      the MSI and survives the swap untouched. See docs/upgrade-behavior.md.
+    -->
+    <MajorUpgrade
+      AllowSameVersionUpgrades="yes"
+      DowngradeErrorMessage="Eine neuere Version von !(bind.Property.ProductName) ist bereits installiert." />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 
     <!-- App icon used in Start Menu, Desktop shortcuts, and Add/Remove Programs. -->
