@@ -1,0 +1,148 @@
+name: Auto-tag on merge
+
+# Bumps the version tag automatically whenever something lands on main.
+# The bump direction is derived from the most recent commit message using
+# the Conventional Commits convention (which our PR titles already follow):
+#
+#   feat:                → minor bump   (0.4.0 → 0.5.0)
+#   feat!: / BREAKING    → major bump   (0.4.0 → 1.0.0)
+#   fix: / chore: / etc. → patch bump   (0.4.0 → 0.4.1)
+#   merge commit / other → patch bump   (default)
+#
+# Output: a new lightweight git tag like `v0.4.1` pushed to origin.
+# The Build-MSI workflow picks this up automatically the next time the
+# user runs it manually (we deliberately don't auto-build to honour the
+# "no surprise CI burn" preference).
+#
+# Skip mechanism: include `[skip tag]` anywhere in the commit message.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write   # required so the workflow can push the new tag back
+
+# Prevent two pushes-in-quick-succession from racing to create the same tag.
+concurrency:
+  group: auto-tag-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  auto-tag:
+    runs-on: ubuntu-latest
+    if: ${{ !contains(github.event.head_commit.message, '[skip tag]') }}
+
+    steps:
+      - name: Checkout repository (full history + tags)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Skip if HEAD already carries a tag
+        id: precheck
+        shell: bash
+        run: |
+          # If somebody (or an earlier workflow run) already tagged this
+          # commit, do nothing. Lets manual `git tag v0.5.0 && push --tags`
+          # still work without the auto-tagger trampling it.
+          EXISTING=$(git tag --points-at HEAD | head -n 1)
+          if [ -n "$EXISTING" ]; then
+            echo "HEAD already has tag '$EXISTING' — skipping auto-tag."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Determine bump type from commit message
+        if: steps.precheck.outputs.skip != 'true'
+        id: bump
+        shell: bash
+        run: |
+          MSG=$(git log -1 --pretty=%B)
+          echo "Last commit message:"
+          echo "$MSG"
+          echo "---"
+
+          FIRST_LINE=$(echo "$MSG" | head -n 1)
+
+          # Conventional Commits matchers:
+          # `<type>(<scope>)?!: <desc>`        → breaking (major)
+          # `<type>(<scope>)?: <desc>`         → feat=minor, others=patch
+          # `BREAKING CHANGE:` anywhere        → major
+          if echo "$MSG" | grep -qE '^BREAKING CHANGE:|BREAKING CHANGE:' || \
+             echo "$FIRST_LINE" | grep -qE '^[a-zA-Z]+(\([^)]+\))?!:'; then
+            BUMP="major"
+          elif echo "$FIRST_LINE" | grep -qE '^feat(\([^)]+\))?:'; then
+            BUMP="minor"
+          else
+            BUMP="patch"
+          fi
+
+          echo "Bump type: $BUMP"
+          echo "bump=$BUMP" >> "$GITHUB_OUTPUT"
+
+      - name: Compute next version
+        if: steps.precheck.outputs.skip != 'true'
+        id: ver
+        shell: bash
+        run: |
+          # Last existing tag (excluding HEAD which we already checked).
+          LATEST=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag: $LATEST"
+
+          # Strip leading 'v' and any pre-release/build suffix.
+          STRIPPED=${LATEST#v}
+          STRIPPED=${STRIPPED%%-*}
+          STRIPPED=${STRIPPED%%+*}
+
+          IFS='.' read -ra PARTS <<< "$STRIPPED"
+          MAJOR=${PARTS[0]:-0}
+          MINOR=${PARTS[1]:-0}
+          PATCH=${PARTS[2]:-0}
+
+          case "${{ steps.bump.outputs.bump }}" in
+            major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+            minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+            patch) PATCH=$((PATCH + 1)) ;;
+          esac
+
+          NEXT="v${MAJOR}.${MINOR}.${PATCH}"
+
+          # Defensive: if for any reason the computed tag already exists
+          # (e.g. someone manually created a future tag), don't overwrite.
+          if git rev-parse "$NEXT" >/dev/null 2>&1; then
+            echo "Tag $NEXT already exists in the repo — skipping to avoid overwrite."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "next=$NEXT" >> "$GITHUB_OUTPUT"
+            echo "Next version: $NEXT"
+          fi
+
+      - name: Create and push tag
+        if: steps.precheck.outputs.skip != 'true' && steps.ver.outputs.skip != 'true'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          NEXT="${{ steps.ver.outputs.next }}"
+          MSG=$(git log -1 --pretty=%s)
+          git tag -a "$NEXT" -m "Auto-tag for: $MSG"
+          git push origin "$NEXT"
+          echo "::notice title=Tagged::$NEXT — next 'Build MSI on demand' run will produce $NEXT.0"
+
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          if [ "${{ steps.precheck.outputs.skip }}" = "true" ]; then
+            echo "## :pause_button: Skipped — HEAD already tagged" >> "$GITHUB_STEP_SUMMARY"
+          elif [ "${{ steps.ver.outputs.skip }}" = "true" ]; then
+            echo "## :warning: Skipped — computed tag already exists" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "## :label: Auto-tagged ${{ steps.ver.outputs.next }}" >> "$GITHUB_STEP_SUMMARY"
+            echo "Bump type: \`${{ steps.bump.outputs.bump }}\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Run **Build MSI (on demand)** in the Actions tab to produce a new MSI artifact." >> "$GITHUB_STEP_SUMMARY"
+          fi
