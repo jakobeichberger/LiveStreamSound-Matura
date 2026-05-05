@@ -24,31 +24,58 @@ jobs:
           # Full history + tags needed so `git describe` can find the latest release tag.
           fetch-depth: 0
 
-      - name: Compute version from git tag
+      - name: Compute version from git tag + commits-since-tag
         id: version
         shell: pwsh
         run: |
           if ("${{ inputs.version_override }}" -ne "") {
-            $version = "${{ inputs.version_override }}"
-            Write-Host "Using override version: $version"
+            $version4 = "${{ inputs.version_override }}"
+            Write-Host "Using override version: $version4"
+            # Make sure override has 4 parts.
+            $parts = $version4 -split '\.'
+            while ($parts.Count -lt 4) { $parts = $parts + '0' }
+            $version4 = ($parts[0..3] -join '.')
           }
           else {
-            $tag = (git describe --tags --abbrev=0 2>$null) -as [string]
-            if ([string]::IsNullOrEmpty($tag)) {
-              $tag = "v0.2.0"
-              Write-Host "No git tag found, defaulting to $tag"
+            # Use `git describe --tags --long` which returns e.g.
+            # "v0.4.0-28-g903cc1f" = "tag-commitsSinceTag-gShortHash".
+            # The commits-since-tag goes into the 4th MSI version component
+            # so every commit produces a UNIQUE MSI version. Without this,
+            # every build between two tags has the identical version
+            # ("0.3.0.0" forever) and Windows sees them as the same install.
+            $desc = (git describe --tags --long 2>$null) -as [string]
+            if ([string]::IsNullOrEmpty($desc)) {
+              # No tags yet — fall back to commit count from root.
+              $count = (git rev-list --count HEAD 2>$null) -as [string]
+              if ([string]::IsNullOrEmpty($count)) { $count = "0" }
+              $version4 = "0.0.0.$count"
+              Write-Host "No git tag found, defaulting to $version4 (HEAD has $count commits)"
             } else {
-              Write-Host "Latest git tag: $tag"
+              # Parse "v0.4.0-28-g903cc1f" → tag=v0.4.0, commits=28
+              # Right-most match: TAG-COMMITS-gHASH
+              if ($desc -match '^(?<tag>.+)-(?<commits>\d+)-g[0-9a-f]+$') {
+                $tag = $matches.tag
+                $commits = [int]$matches.commits
+              } else {
+                # Exactly on a tag → format is just "v0.4.0" without -N-gHASH.
+                # `--long` always includes -N-gHASH so this path shouldn't hit
+                # but defend against future git changes.
+                $tag = $desc
+                $commits = 0
+              }
+              # Strip leading 'v' and any pre-release suffix (e.g. -beta.1).
+              $semver = ($tag -replace '^v', '' -split '-')[0]
+              $semverParts = $semver -split '\.'
+              # Take major.minor.patch, then 4th component = commits-since-tag
+              while ($semverParts.Count -lt 3) { $semverParts = $semverParts + '0' }
+              $version4 = "$($semverParts[0]).$($semverParts[1]).$($semverParts[2]).$commits"
+              Write-Host "git describe → $desc"
+              Write-Host "  Tag = $tag, commits since tag = $commits"
+              Write-Host "  → MSI version = $version4"
             }
-            # Strip leading 'v' and any pre-release suffix (e.g. '-beta.1')
-            $version = ($tag -replace '^v', '' -split '-')[0]
           }
-          # MSI expects exactly 4 numeric parts. Pad with zeros.
-          $parts = $version -split '\.'
-          while ($parts.Count -lt 4) { $parts = $parts + '0' }
-          $version4 = ($parts[0..3] -join '.')
           "version=$version4" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          Write-Host "Computed MSI version: $version4"
+          Write-Host "Final MSI version: $version4"
 
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@v4

@@ -104,10 +104,11 @@ The MSI artifact installs cleanly on a freshly imaged Windows PC without a separ
 
 ### Versioning
 
-The version is derived from the latest git tag, e.g.:
-- Tag `v0.3.0` → MSI version `0.3.0.0`, artifact `LiveStreamSound-MSI-v0.3.0.0`
-- Tag `v1.0.0-beta.1` → MSI version `1.0.0.0` (pre-release suffix is stripped for MSI)
-- No tag → falls back to `v0.2.0`
+Version is derived from the latest git tag **plus commits-since-tag** — so every commit produces a unique MSI build, even without a fresh tag:
+- Tag `v0.4.0` exactly at HEAD → MSI version `0.4.0.0`
+- Tag `v0.4.0`, 5 commits later → MSI version `0.4.0.5`
+- Tag `v1.0.0-beta.1`, 12 commits later → MSI version `1.0.0.12` (pre-release suffix is stripped)
+- No tag in repo → `0.0.0.<HEAD-commit-count>` fallback
 
 **Publish a new version:**
 ```bash
