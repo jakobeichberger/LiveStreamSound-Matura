@@ -31,7 +31,6 @@ concurrency:
 jobs:
   auto-tag:
     runs-on: ubuntu-latest
-    if: ${{ !contains(github.event.head_commit.message, '[skip tag]') }}
 
     steps:
       - name: Checkout repository (full history + tags)
@@ -40,7 +39,26 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Skip if commit's first line carries the skip marker
+        id: skipcheck
+        shell: bash
+        run: |
+          # Only check the SUBJECT (first line) of the commit, not the body —
+          # otherwise documentation that mentions the marker (e.g. an
+          # `## Regeln` table in the PR description) accidentally disables
+          # auto-tagging when the squash-merge inlines the description into
+          # the commit message body.
+          SUBJECT=$(git log -1 --pretty=%s)
+          echo "Subject: $SUBJECT"
+          if echo "$SUBJECT" | grep -q '\[skip tag\]'; then
+            echo "Skip marker present in subject — not tagging."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Skip if HEAD already carries a tag
+        if: steps.skipcheck.outputs.skip != 'true'
         id: precheck
         shell: bash
         run: |
@@ -56,7 +74,7 @@ jobs:
           fi
 
       - name: Determine bump type from commit message
-        if: steps.precheck.outputs.skip != 'true'
+        if: steps.skipcheck.outputs.skip != 'true' && steps.precheck.outputs.skip != 'true'
         id: bump
         shell: bash
         run: |
@@ -84,7 +102,7 @@ jobs:
           echo "bump=$BUMP" >> "$GITHUB_OUTPUT"
 
       - name: Compute next version
-        if: steps.precheck.outputs.skip != 'true'
+        if: steps.skipcheck.outputs.skip != 'true' && steps.precheck.outputs.skip != 'true'
         id: ver
         shell: bash
         run: |
@@ -121,7 +139,7 @@ jobs:
           fi
 
       - name: Create and push tag
-        if: steps.precheck.outputs.skip != 'true' && steps.ver.outputs.skip != 'true'
+        if: steps.skipcheck.outputs.skip != 'true' && steps.precheck.outputs.skip != 'true' && steps.ver.outputs.skip != 'true'
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
@@ -136,7 +154,9 @@ jobs:
         if: always()
         shell: bash
         run: |
-          if [ "${{ steps.precheck.outputs.skip }}" = "true" ]; then
+          if [ "${{ steps.skipcheck.outputs.skip }}" = "true" ]; then
+            echo "## :pause_button: Skipped — \`[skip tag]\` in commit subject" >> "$GITHUB_STEP_SUMMARY"
+          elif [ "${{ steps.precheck.outputs.skip }}" = "true" ]; then
             echo "## :pause_button: Skipped — HEAD already tagged" >> "$GITHUB_STEP_SUMMARY"
           elif [ "${{ steps.ver.outputs.skip }}" = "true" ]; then
             echo "## :warning: Skipped — computed tag already exists" >> "$GITHUB_STEP_SUMMARY"

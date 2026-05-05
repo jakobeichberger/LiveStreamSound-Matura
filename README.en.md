@@ -111,7 +111,7 @@ On every push to `main`, the [`auto-tag-on-merge.yml`](.github/workflows/auto-ta
 | `feat: …` or `feat(scope): …` | **minor** | `0.4.0` → `0.5.0` |
 | `feat!: …` or `BREAKING CHANGE:` in body | **major** | `0.4.0` → `1.0.0` |
 | `fix: …`, `chore: …`, `docs: …`, anything else | **patch** | `0.4.0` → `0.4.1` |
-| Skip — include `[skip tag]` anywhere in the message | (no tag) | unchanged |
+| Skip — include `[skip tag]` in the **first line** of the commit | (no tag) | unchanged |
 
 The Build-MSI workflow then uses the tag as the MSI version (`v0.4.1` → MSI `0.4.1.0`). Plus: a manual run **between two tags** uses `commits-since-tag` as the 4th component for a unique build (`0.4.1.7`).
 
