@@ -283,18 +283,36 @@ public sealed class ControlServer : IAsyncDisposable
             if (!string.IsNullOrEmpty(registered.CurrentOutputDeviceId))
                 await SendOnStreamAsync(registered, stream, new SetOutputDevice(registered.CurrentOutputDeviceId), ct);
 
-            // Message loop
+            // Message loop. Track WHY we exited so the disconnect log line
+            // distinguishes graceful close (msg=null) from listener cancellation
+            // from per-message handler exceptions.
+            string exitReason = "unknown";
             while (!ct.IsCancellationRequested && tcp.Connected)
             {
                 var msg = await MessageJson.ReadFrameAsync(stream, ct).ConfigureAwait(false);
-                if (msg is null) break;
+                if (msg is null)
+                {
+                    exitReason = "EOF (client closed gracefully or TCP died)";
+                    break;
+                }
                 await HandleMessageAsync(registered, msg, stream, ct);
             }
+            if (ct.IsCancellationRequested) exitReason = "session stopped (host-side cancellation)";
+            else if (!tcp.Connected) exitReason = "tcp.Connected went false (heartbeat probe failed)";
+            _log.Info("ControlServer", $"{remote} ({registered.ClientId}): message loop ended — {exitReason}");
         }
         catch (OperationCanceledException) { }
         catch (IOException ex)
         {
-            _log.Info("ControlServer", $"{remote}: connection closed ({ex.GetType().Name})");
+            // Include the actual exception message + inner exception so we
+            // can tell apart "client closed cleanly" vs "TCP RST mid-session"
+            // vs "read timed out" vs "Wi-Fi dropped". The previous version
+            // only logged the type name, which made every disconnect look
+            // identical and useless for diagnosis.
+            var inner = ex.InnerException?.Message ?? "";
+            _log.Info("ControlServer",
+                $"{remote}: connection closed — {ex.GetType().Name}: '{ex.Message}'" +
+                (string.IsNullOrEmpty(inner) ? "" : $" (inner: {inner})"));
         }
         catch (Exception ex)
         {

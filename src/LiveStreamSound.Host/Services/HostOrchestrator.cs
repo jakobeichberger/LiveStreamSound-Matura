@@ -95,8 +95,16 @@ public sealed class HostOrchestrator : IAsyncDisposable
             // Auto-start idle-client discovery so the dashboard can show
             // "client X is waiting for an invitation" toasts as soon as a
             // session is live. Idempotent — safe even if the invite dialog
-            // also calls Start() later.
-            try { IdleClientDiscovery.Start(); } catch { /* non-fatal */ }
+            // also calls Start() later. Failures are non-fatal but MUST be
+            // logged so a teacher who sees no auto-discovery has a starting
+            // point — previously the catch swallowed the exception silently.
+            try { IdleClientDiscovery.Start(); }
+            catch (Exception ex)
+            {
+                Log.Warn("Orchestrator",
+                    $"IdleClientDiscovery.Start() failed — toasts for waiting clients " +
+                    $"will not appear (manual invite still works): {ex.Message}");
+            }
             // Optionally mute the host's own speakers — common Matura case
             // where teacher's laptop is in the same room as the beamer
             // speakers and double-audio is distracting. Stream is unaffected
